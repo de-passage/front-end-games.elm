@@ -47,10 +47,10 @@ subscriptions model =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "Application Title"
+    { title = "Games!"
     , body =
         [ toUnstyled <|
             div []
-                [ text "New Application", Html.map (\msg -> TicTacToeMsg msg) <| TTT.view model.tictactoe ]
+                [ text "TicTacToe", Html.map (\msg -> TicTacToeMsg msg) <| TTT.view model.tictactoe ]
         ]
     }

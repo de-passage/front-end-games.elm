@@ -2,7 +2,7 @@ module TicTacToe exposing (Controller(..), Model, Msg(..), init, update, view)
 
 import Css exposing (..)
 import Dict exposing (Dict)
-import Html.Styled exposing (Attribute, Html, button, div, text)
+import Html.Styled exposing (Attribute, Html, button, div, table, tbody, td, text, tr)
 import Html.Styled.Attributes exposing (css)
 import Html.Styled.Events exposing (onClick)
 import List.Extra as List
@@ -103,6 +103,8 @@ samePlayer : Player -> Player -> Bool
 samePlayer (Player a) (Player b) =
     a == b
 
+samePosition : Position -> Position -> Bool
+samePosition (Position a) (Position b) = a == b
 
 cellPlayer : Cell -> Maybe Player
 cellPlayer cell =
@@ -125,7 +127,18 @@ allSamePlayer dict pos =
     in
     players
         |> Maybe.andThen List.head
-        |> Maybe.andThen (\p -> players |> Maybe.andThen (\l -> if List.all (samePlayer p) l then Just p else Nothing))
+        |> Maybe.andThen
+            (\p ->
+                players
+                    |> Maybe.andThen
+                        (\l ->
+                            if List.all (samePlayer p) l then
+                                Just p
+
+                            else
+                                Nothing
+                        )
+            )
         |> Maybe.map (\p -> ( positions, p ))
 
 
@@ -210,89 +223,85 @@ cellPosition =
     Tuple.first
 
 
-type alias HtmlElement =
-    List (Attribute Msg) -> List (Html Msg) -> Html Msg
+type Clickable
+    = Clickable
+    | NonClickable
 
 
-viewCell : HtmlElement -> IndexedCell -> Html Msg
-viewCell el cell =
+type alias CellDecorator =
+    IndexedCell -> List (Attribute Msg)
+
+
+isClickable : Clickable -> Bool
+isClickable c =
+    case c of
+        Clickable ->
+            True
+
+        NonClickable ->
+            False
+
+
+viewCell : CellDecorator -> Clickable -> IndexedCell -> Html Msg
+viewCell decorate click cell =
+    let
+        styledTd attributes =
+            td ((cellStyle :: attributes) ++ decorate cell)
+    in
     case cellValue cell of
         Played player ->
-            div
-                [ css
-                    [ displayFlex
-                    , width (em 2)
-                    , border2 (px 1) solid
-                    ]
-                ]
-                [ symbolFor player ]
+            styledTd [] [ symbolFor player ]
 
         EmptyCell ->
-            el
-                [ onClick (PlayAt <| cellPosition cell)
-                , css
-                    [ displayFlex
-                    , border2 (px 1) solid
-                    ]
-                ]
-                [  ]
+            styledTd
+                (if isClickable click then
+                    [ onClick (PlayAt <| cellPosition cell) ]
+
+                 else
+                    []
+                )
+                []
 
 
-viewRow : HtmlElement -> List IndexedCell -> Html Msg
-viewRow f cells =
-    div
-        [ css
-            [ displayFlex
-            , height <| em 2
-            ]
-        ]
-    <|
-        List.map (viewCell f) cells
+viewRow : CellDecorator -> Clickable -> List IndexedCell -> Html Msg
+viewRow d f cells =
+    tr [] <| List.map (viewCell d f) cells
 
 
-viewBoard : HtmlElement -> List (List IndexedCell) -> Html Msg
-viewBoard f b =
-    div
-        [ css
-            [ border2 (px 1) solid
-            , display inlineBlock
-            ]
-        ]
-        (List.map (viewRow f) b)
+viewBoard : CellDecorator -> Clickable -> List (List IndexedCell) -> Html Msg
+viewBoard d f b =
+    table [ tableStyle ] [ tbody [] (List.map (viewRow d f) b) ]
 
 
-viewOnGoing : GameOngoingModel -> Html Msg
-viewOnGoing model =
-    let
-        b =
-            boardAsTable model.board
-    in
+viewGame : Board -> List (Html Msg) -> CellDecorator -> Clickable -> Html Msg
+viewGame board control decorate clickable =
     div []
-        [ div [] [ text (playerTurnText model.currentPlayer) ]
-        , viewBoard button b
+        [ div [] control
+        , viewBoard decorate clickable (boardAsTable board)
         ]
 
+decorateVictory : GameState -> CellDecorator
+decorateVictory state (cellIndex, _) =
+    case state of
+       Won (positions, _) -> List.find (samePosition cellIndex) positions
+        |> Maybe.map (always winningCellStyle)
+        |> Maybe.withDefault []
+       _ -> []
 
-viewGameOver : GameOverModel -> Html Msg
-viewGameOver model =
-    let
-        b =
-            boardAsTable model.board
-    in
-    div []
-        [ div [] [ text (toString model.state) ]
-        , viewBoard div b
-        ]
+gameEndedControlBoard : GameOverModel -> List (Html Msg)
+gameEndedControlBoard game = [text (toString game.state) ]
 
+gameOnGoingControlBoard : GameOngoingModel -> List (Html Msg)
+gameOnGoingControlBoard game = [text (playerTurnText game.currentPlayer)]
 
 view : Model -> Html Msg
 view model =
     case model of
         GameOver m ->
-            viewGameOver m
+            viewGame m.board (gameEndedControlBoard m) (decorateVictory m.state) NonClickable
 
         GameOngoing m ->
-            viewOnGoing m
+            viewGame m.board (gameOnGoingControlBoard m) (always []) Clickable
 
 
 update : Msg -> Model -> Model
@@ -340,8 +349,8 @@ positionToString (Position p) =
 toString : GameState -> String
 toString state =
     case state of
-        Won ( list, Player i ) ->
-            "Player " ++ String.fromInt i ++ " has won! Winning positions are : " ++ (list |> List.map positionToString |> List.intersperse ", " |> String.concat)
+        Won ( _, Player i ) ->
+            "Player " ++ String.fromInt i ++ " has won!"
 
         Draw ->
             "It's a draw!"
@@ -353,3 +362,53 @@ toString state =
 playerTurnText : Player -> String
 playerTurnText (Player i) =
     "It is player " ++ String.fromInt i ++ "'s turn to play."
+
+
+refSize : Float
+refSize =
+    15
+
+
+boardSize : Em
+boardSize =
+    em refSize
+
+
+cellSize : Em
+cellSize =
+    em (refSize / 3)
+
+
+tableStyle : Attribute Msg
+tableStyle =
+    css
+        [ tableLayout fixed
+        , width boardSize
+        , height boardSize
+        , border2 (px 1) solid
+        , borderSpacing (px 0)
+        ]
+
+
+cellStyle : Attribute Msg
+cellStyle =
+    css
+        [ border3 (px 1) solid black
+        , overflow hidden
+        , textOverflow ellipsis
+        , width cellSize
+        , height cellSize
+        , textAlign center
+        ]
+
+winningCellStyle : List (Attribute Msg)
+winningCellStyle = [css [ backgroundColor winningGreen, color white, fontWeight bold ]]
+
+winningGreen : Color
+winningGreen = hex "2c962f"
+
+white : Color
+white = hex "ffffff"
+
+black : Color 
+black = hex "000000"
