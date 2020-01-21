@@ -58,6 +58,7 @@ type Controller
 type Msg
     = PlayAt Position
     | Restart
+    | Surrender
 
 
 type Position
@@ -68,6 +69,7 @@ type GameState
     = Won Victory
     | Draw
     | OnGoing
+    | Surrendered Player
 
 
 type alias IndexedCell =
@@ -103,8 +105,11 @@ samePlayer : Player -> Player -> Bool
 samePlayer (Player a) (Player b) =
     a == b
 
+
 samePosition : Position -> Position -> Bool
-samePosition (Position a) (Position b) = a == b
+samePosition (Position a) (Position b) =
+    a == b
+
 
 cellPlayer : Cell -> Maybe Player
 cellPlayer cell =
@@ -275,24 +280,58 @@ viewBoard d f b =
 
 viewGame : Board -> List (Html Msg) -> CellDecorator -> Clickable -> Html Msg
 viewGame board control decorate clickable =
-    div []
+    div
+        [ css
+            [ margin auto
+            , maxWidth fitContent
+            ]
+        ]
         [ div [] control
         , viewBoard decorate clickable (boardAsTable board)
         ]
 
+
 decorateVictory : GameState -> CellDecorator
-decorateVictory state (cellIndex, _) =
+decorateVictory state ( cellIndex, _ ) =
     case state of
-       Won (positions, _) -> List.find (samePosition cellIndex) positions
-        |> Maybe.map (always winningCellStyle)
-        |> Maybe.withDefault []
-       _ -> []
+        Won ( positions, _ ) ->
+            if Maybe.isJust (List.find (samePosition cellIndex) positions) then
+                winningCellStyle
+
+            else
+                []
+
+        _ ->
+            []
+
 
 gameEndedControlBoard : GameOverModel -> List (Html Msg)
-gameEndedControlBoard game = [text (toString game.state) ]
+gameEndedControlBoard game =
+    [ div []
+        [ text (gameStateToString game.state) ]
+    , div [ buttonDivStyle ]
+        [ button [ onClick Restart ] [ text "Restart" ]
+        ]
+    ]
+
 
 gameOnGoingControlBoard : GameOngoingModel -> List (Html Msg)
-gameOnGoingControlBoard game = [text (playerTurnText game.currentPlayer)]
+gameOnGoingControlBoard game =
+    [ div []
+        [ div [] [ text (playerTurnText game.currentPlayer) ]
+        , div [ buttonDivStyle ]
+            [ button [ onClick Surrender ] [ text "Surrender" ]
+            ]
+        ]
+    ]
+
+
+buttonDivStyle : Attribute Msg
+buttonDivStyle =
+    css
+        [ margin (px 5)
+        ]
+
 
 view : Model -> Html Msg
 view model =
@@ -304,18 +343,30 @@ view model =
             viewGame m.board (gameOnGoingControlBoard m) (always []) Clickable
 
 
+ongoing : Model -> (GameOngoingModel -> Model) -> Model
+ongoing model f =
+    case model of
+        GameOver _ ->
+            model
+
+        GameOngoing m ->
+            f m
+
+
 update : Msg -> Model -> Model
 update msg model =
     case msg of
         Restart ->
             init
 
-        PlayAt pos ->
-            case model of
-                GameOver _ ->
-                    model
+        Surrender ->
+            ongoing model <|
+                \m ->
+                    GameOver { board = m.board, state = Surrendered m.currentPlayer }
 
-                GameOngoing m ->
+        PlayAt pos ->
+            ongoing model <|
+                \m ->
                     case play m.board pos m.currentPlayer of
                         Nothing ->
                             model
@@ -334,20 +385,8 @@ init =
     GameOngoing { board = emptyBoard, currentPlayer = player1 }
 
 
-positionToString : Position -> String
-positionToString (Position p) =
-    let
-        x =
-            p // 3 + 1
-
-        y =
-            modBy 3 p + 1
-    in
-    "(" ++ String.fromInt p ++ "| " ++ String.fromInt x ++ ", " ++ String.fromInt y ++ ")"
-
-
-toString : GameState -> String
-toString state =
+gameStateToString : GameState -> String
+gameStateToString state =
     case state of
         Won ( _, Player i ) ->
             "Player " ++ String.fromInt i ++ " has won!"
@@ -355,8 +394,11 @@ toString state =
         Draw ->
             "It's a draw!"
 
-        _ ->
+        OnGoing ->
             "The game is not over yet"
+
+        Surrendered (Player i) ->
+            "Player " ++ String.fromInt i ++ " surrendered..."
 
 
 playerTurnText : Player -> String
@@ -401,14 +443,27 @@ cellStyle =
         , textAlign center
         ]
 
+
 winningCellStyle : List (Attribute Msg)
-winningCellStyle = [css [ backgroundColor winningGreen, color white, fontWeight bold ]]
+winningCellStyle =
+    [ css
+        [ backgroundColor winningGreen
+        , color white
+        , fontWeight bold
+        ]
+    ]
+
 
 winningGreen : Color
-winningGreen = hex "2c962f"
+winningGreen =
+    hex "2c962f"
+
 
 white : Color
-white = hex "ffffff"
+white =
+    hex "ffffff"
 
-black : Color 
-black = hex "000000"
+
+black : Color
+black =
+    hex "000000"
