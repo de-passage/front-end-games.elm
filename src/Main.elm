@@ -34,10 +34,10 @@ update msg model =
     case msg of
         TicTacToeMsg tttmsg ->
             let
-                m =
+                (m, c) =
                     TTT.update tttmsg model.tictactoe
             in
-            ( { model | tictactoe = m }, Cmd.none )
+            ( { model | tictactoe = m }, Cmd.map TicTacToeMsg c )
 
 
 subscriptions : Model -> Sub Msg

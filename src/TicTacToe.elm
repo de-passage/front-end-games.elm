@@ -1,13 +1,20 @@
-module TicTacToe exposing (Controller(..), Model, Msg(..), init, update, view)
+module TicTacToe exposing (Model, Msg(..), init, update, view)
 
 import Css exposing (..)
 import Dict exposing (Dict)
-import Html.Styled exposing (Attribute, Html, button, div, table, tbody, td, text, tr)
-import Html.Styled.Attributes exposing (css)
-import Html.Styled.Events exposing (onClick)
+import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, table, tbody, td, text, tr)
+import Html.Styled.Attributes exposing (checked, css, name, type_)
+import Html.Styled.Events exposing (onClick, onInput)
 import List.Extra as List
 import Maybe.Extra as Maybe
+import Process
+import Task
 import Tuple
+
+
+type Either a b
+    = Left a
+    | Right b
 
 
 type Player
@@ -33,21 +40,22 @@ type Board
     = Board (Dict Int Cell)
 
 
-type Model
-    = GameOver GameOverModel
-    | GameOngoing GameOngoingModel
-
-
-type alias GameOngoingModel =
-    { board : Board
-    , currentPlayer : Player
-    }
-
-
-type alias GameOverModel =
+type alias Model =
     { board : Board
     , state : GameState
+    , options : GameOptions
+    , expectingRemotePlay : Bool
     }
+
+
+type alias PlayerInformation =
+    { symbol : Char
+    , controller : Controller
+    }
+
+
+type GameOptions
+    = GameOptions ( PlayerInformation, PlayerInformation )
 
 
 type Controller
@@ -56,9 +64,10 @@ type Controller
 
 
 type Msg
-    = PlayAt Position
+    = PlayedAt Position Player
     | Restart
-    | Surrender
+    | Surrendered Player
+    | OptionChanged GameOptions
 
 
 type Position
@@ -68,8 +77,14 @@ type Position
 type GameState
     = Won Victory
     | Draw
-    | OnGoing
-    | Surrendered Player
+    | OnGoing Player
+    | Surrender Player
+    | WaitingFor Player
+    | Stopped
+
+
+type alias VictoryStatus =
+    Either Victory (List Position)
 
 
 type alias IndexedCell =
@@ -80,25 +95,21 @@ type alias Victory =
     ( List Position, Player )
 
 
-availablePositions : Board -> List Position
-availablePositions (Board cells) =
-    cells
-        |> Dict.toList
-        |> List.filter (Tuple.second >> isEmpty)
-        |> List.map (Tuple.first >> Position)
+
+-- UTILITIES
 
 
-play : Board -> Position -> Player -> Maybe Board
-play (Board cells) (Position i) player =
-    case Dict.get i cells of
-        Just EmptyCell ->
-            cells
-                |> Dict.update i (Maybe.map <| always <| Played player)
-                |> Board
-                |> Just
+isRunning : GameState -> Bool
+isRunning state =
+    case state of
+        OnGoing _ ->
+            True
+
+        WaitingFor _ ->
+            True
 
         _ ->
-            Nothing
+            False
 
 
 samePlayer : Player -> Player -> Bool
@@ -121,30 +132,104 @@ cellPlayer cell =
             Just player
 
 
-allSamePlayer : Dict Int Cell -> List Int -> Maybe Victory
-allSamePlayer dict pos =
+isControlledBy : Controller -> GameOptions -> Player -> Bool
+isControlledBy ctrl =
+    dispatchOnPlayer (\c -> c.controller == ctrl)
+
+
+setController : Controller -> GameOptions -> Player -> GameOptions
+setController contr opts player =
+    mapOnPlayer (\r -> { r | controller = contr }) opts player
+
+
+dispatchOnPlayer : (PlayerInformation -> a) -> GameOptions -> Player -> a
+dispatchOnPlayer f (GameOptions ( a, b )) (Player i) =
+    if i == 1 then
+        f a
+
+    else
+        f b
+
+
+mapOnPlayer : (PlayerInformation -> PlayerInformation) -> GameOptions -> Player -> GameOptions
+mapOnPlayer f (GameOptions ( a, b )) (Player i) =
+    if i == 1 then
+        GameOptions ( f a, b )
+
+    else
+        GameOptions ( a, f b )
+
+
+isEmpty : Cell -> Bool
+isEmpty c =
+    case c of
+        EmptyCell ->
+            True
+
+        _ ->
+            False
+
+
+cellValue : IndexedCell -> Cell
+cellValue =
+    Tuple.second
+
+
+cellPosition : IndexedCell -> Position
+cellPosition =
+    Tuple.first
+
+
+
+-- COMMANDS
+
+
+delay : Float -> msg -> Cmd msg
+delay time msg =
+    Process.sleep time
+        |> Task.perform (always msg)
+
+
+
+-- GAME LOGIC
+
+
+play : Board -> Position -> Player -> Maybe Board
+play (Board cells) (Position i) player =
+    case Dict.get i cells of
+        Just EmptyCell ->
+            cells
+                |> Dict.update i (Maybe.map <| always <| Played player)
+                |> Board
+                |> Just
+
+        _ ->
+            Nothing
+
+
+availablePositions : Board -> List Position
+availablePositions (Board cells) =
+    cells
+        |> Dict.toList
+        |> List.filter (Tuple.second >> isEmpty)
+        |> List.map (Tuple.first >> Position)
+
+
+allSamePlayer : Dict Int Cell -> Player -> List Int -> Maybe (List Position)
+allSamePlayer dict player pos =
     let
         players =
             Maybe.combine <| List.map (\i -> Dict.get i dict |> Maybe.andThen cellPlayer) pos
-
-        positions =
-            List.map Position pos
     in
     players
-        |> Maybe.andThen List.head
         |> Maybe.andThen
-            (\p ->
-                players
-                    |> Maybe.andThen
-                        (\l ->
-                            if List.all (samePlayer p) l then
-                                Just p
+            (\l ->
+                if List.all (samePlayer player) l then
+                    Just (List.map Position pos)
 
-                            else
-                                Nothing
-                        )
+                else
+                    Nothing
             )
-        |> Maybe.map (\p -> ( positions, p ))
 
 
 winConditions : List (List Int)
@@ -161,39 +246,126 @@ nextPlayer player =
         player1
 
 
-gameState : Board -> GameState
-gameState (Board cells) =
+gameState : Board -> Player -> VictoryStatus
+gameState (Board cells) player =
     winConditions
-        |> List.map (allSamePlayer cells)
+        |> List.map (allSamePlayer cells player)
         |> List.find Maybe.isJust
         |> Maybe.join
-        |> (\mb ->
-                case mb of
-                    Nothing ->
-                        if Dict.values cells |> List.any isEmpty then
-                            OnGoing
-
-                        else
-                            Draw
-
-                    Just player ->
-                        Won player
-           )
+        |> Maybe.map (\p -> Left ( p, player ))
+        |> Maybe.withDefault (Right (availablePositions (Board cells)))
 
 
-isEmpty : Cell -> Bool
-isEmpty c =
-    case c of
-        EmptyCell ->
-            True
 
-        _ ->
-            False
+-- AI
 
 
-emptyBoard : Board
-emptyBoard =
-    List.repeat 9 EmptyCell |> List.indexedMap Tuple.pair |> Dict.fromList |> Board
+type alias Depth =
+    Int
+
+
+type alias Score =
+    Int
+
+
+type alias Move =
+    ( Position, Depth )
+
+
+defeat : Score
+defeat =
+    -(2 ^ 32)
+
+
+victory : Score
+victory =
+    2 ^ 32
+
+
+draw : Score
+draw =
+    0
+
+
+computeNextMove : Board -> Player -> Msg
+computeNextMove board player =
+    -- compute the list of best moves from the current board for the current player
+    bestMoves board player 0
+        -- extract the list of positions from the next move
+        |> Tuple.second
+        -- get the one with minimum depth (fastest victory)
+        |> List.minimumBy Tuple.second
+        -- take the position
+        |> Maybe.map Tuple.first
+        -- create a message to play a this position
+        |> Maybe.map (\p -> PlayedAt p player)
+        -- if we failed at any point (shouldn't happen if the algo is correct), give up
+        |> Maybe.withDefault (Surrendered player)
+
+
+{-| Computes the score of a the best outcome of a given move on a given board by a given player. A higher score means
+better chances of victory. The depth given in second position is the number of moves needed to
+reach the best computed outcome. Invalid moves return (draw, 0).
+-}
+minMax : Board -> Player -> Position -> Depth -> ( Score, Depth )
+minMax board player position depth =
+    case play board position player of
+        -- garbage in, garbage out
+        Nothing ->
+            ( draw, 0 )
+
+        Just boardAtNextMove ->
+            case gameState boardAtNextMove player of
+                -- we won
+                Left _ ->
+                    ( victory, depth )
+
+                Right status ->
+                    if List.isEmpty status then
+                        ( draw, 0 )
+
+                    else
+                        -- the game goes on
+                        let
+                            -- get the best move of the opponent
+                            ( opponentScore, opponentMoves ) =
+                                bestMoves boardAtNextMove (nextPlayer player) depth
+                        in
+                        opponentMoves
+                            |> List.map Tuple.second
+                            -- we do not care about the exact move, only what the best path to victory is
+                            |> List.minimum
+                            |> Maybe.map (\d -> ( opponentScore, d ))
+                            -- failed because no element in the list == draw
+                            |> Maybe.withDefault ( draw, depth )
+
+
+{-| Gets the fastest move to victory. Returns the pair of the score of the best moves and the list of
+corresponding positions on the board. If there is no available move, returns (draw, [])
+-}
+bestMoves : Board -> Player -> Depth -> ( Score, List Move )
+bestMoves board player depth =
+    List.foldl (aggregate board player depth) ( defeat, [] ) (availablePositions board)
+
+
+aggregate : Board -> Player -> Depth -> Position -> ( Score, List Move ) -> ( Score, List Move )
+aggregate board player depth position ( currentMax, possibilities ) =
+    let
+        ( moveValue, moveDepth ) =
+            minMax board player position (depth + 1)
+    in
+    if moveValue > currentMax then
+        ( moveValue, [ ( position, moveDepth ) ] )
+
+    else if moveValue == currentMax then
+        ( currentMax, ( position, moveDepth ) :: possibilities )
+
+    else
+        ( currentMax, possibilities )
+
+
+
+-- VIEW
 
 
 boardAsTable : Board -> List (List IndexedCell)
@@ -208,78 +380,47 @@ boardAsTable (Board cells) =
     ]
 
 
-symbolFor : Player -> Html msg
-symbolFor player =
+symbolFor : Player -> GameOptions -> Html msg
+symbolFor player (GameOptions ( p1, p2 )) =
     text <|
         if player == player1 then
-            "X"
+            String.fromChar p1.symbol
 
         else
-            "O"
+            String.fromChar p2.symbol
 
 
-cellValue : IndexedCell -> Cell
-cellValue =
-    Tuple.second
-
-
-cellPosition : IndexedCell -> Position
-cellPosition =
-    Tuple.first
-
-
-type Clickable
-    = Clickable
-    | NonClickable
-
-
-type alias CellDecorator =
-    IndexedCell -> List (Attribute Msg)
-
-
-isClickable : Clickable -> Bool
-isClickable c =
-    case c of
-        Clickable ->
-            True
-
-        NonClickable ->
-            False
-
-
-viewCell : CellDecorator -> Clickable -> IndexedCell -> Html Msg
-viewCell decorate click cell =
+viewCell : Model -> IndexedCell -> Html Msg
+viewCell model cell =
     let
         styledTd attributes =
-            td ((cellStyle :: attributes) ++ decorate cell)
+            td (cellStyle :: attributes)
     in
     case cellValue cell of
         Played player ->
-            styledTd [] [ symbolFor player ]
+            styledTd (decorateVictory model.state cell) [ symbolFor player model.options ]
 
         EmptyCell ->
-            styledTd
-                (if isClickable click then
-                    [ onClick (PlayAt <| cellPosition cell) ]
+            case model.state of
+                OnGoing player ->
+                    styledTd [ onClick (PlayedAt (cellPosition cell) player) ] []
 
-                 else
-                    []
-                )
-                []
+                _ ->
+                    styledTd [] []
 
 
-viewRow : CellDecorator -> Clickable -> List IndexedCell -> Html Msg
-viewRow d f cells =
-    tr [] <| List.map (viewCell d f) cells
+viewRow : Model -> List IndexedCell -> Html Msg
+viewRow m cells =
+    tr [] <| List.map (viewCell m) cells
 
 
-viewBoard : CellDecorator -> Clickable -> List (List IndexedCell) -> Html Msg
-viewBoard d f b =
-    table [ tableStyle ] [ tbody [] (List.map (viewRow d f) b) ]
+viewBoard : Model -> List (List IndexedCell) -> Html Msg
+viewBoard m b =
+    table [ tableStyle ] [ tbody [] (List.map (viewRow m) b) ]
 
 
-viewGame : Board -> List (Html Msg) -> CellDecorator -> Clickable -> Html Msg
-viewGame board control decorate clickable =
+viewGame : Model -> List (Html Msg) -> Html Msg
+viewGame model control =
     div
         [ css
             [ margin auto
@@ -287,11 +428,11 @@ viewGame board control decorate clickable =
             ]
         ]
         [ div [] control
-        , viewBoard decorate clickable (boardAsTable board)
+        , viewBoard model (boardAsTable model.board)
         ]
 
 
-decorateVictory : GameState -> CellDecorator
+decorateVictory : GameState -> IndexedCell -> List (Attribute Msg)
 decorateVictory state ( cellIndex, _ ) =
     case state of
         Won ( positions, _ ) ->
@@ -305,120 +446,185 @@ decorateVictory state ( cellIndex, _ ) =
             []
 
 
-gameEndedControlBoard : GameOverModel -> List (Html Msg)
-gameEndedControlBoard game =
+gameStateToViewElements : GameState -> ( String, Msg, String )
+gameStateToViewElements state =
+    case state of
+        Won ( _, Player i ) ->
+            ( "Player " ++ String.fromInt i ++ " has won!"
+            , Restart
+            , "Restart"
+            )
+
+        Draw ->
+            ( "It's a draw!"
+            , Restart
+            , "Restart"
+            )
+
+        OnGoing (Player i) ->
+            ( "It is player " ++ String.fromInt i ++ "'s turn to play."
+            , Surrendered (Player i)
+            , "Surrender"
+            )
+
+        Surrender (Player i) ->
+            ( "Player " ++ String.fromInt i ++ " surrendered..."
+            , Restart
+            , "Restart"
+            )
+
+        Stopped ->
+            ( "Select the desired options and hit Start to begin.", Restart, "Start" )
+
+        WaitingFor (Player i) ->
+            ( "Player " ++ String.fromInt i ++ " is thinking.", Restart, "Restart" )
+
+
+controllerSelection : Model -> String -> Player -> Html Msg
+controllerSelection model lbl player =
+    let
+        p f =
+            f model.options player
+
+        setOpts c =
+            OptionChanged (p (setController c))
+
+        isCtrldBy c =
+            p (isControlledBy c)
+
+        mkRadio n c =
+            radio n lbl (isCtrldBy c) (setOpts c)
+    in
+    Html.Styled.fieldset []
+        [ label [] [ text lbl ]
+        , mkRadio "Human" Human
+        , mkRadio "Computer" Computer
+        ]
+
+
+radio : String -> String -> Bool -> Msg -> Html Msg
+radio value group isChecked msg =
+    label []
+        [ input [ type_ "radio", name group, onInput (always msg), checked isChecked ] []
+        , text value
+        ]
+
+
+viewControlBoard : Model -> List (Html Msg)
+viewControlBoard model =
+    let
+        ( logText, buttonEvent, buttonText ) =
+            gameStateToViewElements model.state
+
+        controls =
+            if not (isRunning model.state) then
+                [ controllerSelection model "Player 1" player1
+                , controllerSelection model "Player 2" player2
+                ]
+
+            else
+                []
+    in
     [ div []
-        [ text (gameStateToString game.state) ]
-    , div [ buttonDivStyle ]
-        [ button [ onClick Restart ] [ text "Restart" ]
-        ]
+        (div [] [ text logText ]
+            :: controls
+            ++ [ div [ buttonDivStyle ]
+                    [ button [ onClick buttonEvent ] [ text buttonText ]
+                    ]
+               ]
+        )
     ]
-
-
-gameOnGoingControlBoard : GameOngoingModel -> List (Html Msg)
-gameOnGoingControlBoard game =
-    [ div []
-        [ div [] [ text (playerTurnText game.currentPlayer) ]
-        , div [ buttonDivStyle ]
-            [ button [ onClick Surrender ] [ text "Surrender" ]
-            ]
-        ]
-    ]
-
-
-buttonDivStyle : Attribute Msg
-buttonDivStyle =
-    css
-        [ margin (px 5)
-        ]
 
 
 view : Model -> Html Msg
 view model =
-    case model of
-        GameOver m ->
-            viewGame m.board (gameEndedControlBoard m) (decorateVictory m.state) NonClickable
-
-        GameOngoing m ->
-            viewGame m.board (gameOnGoingControlBoard m) (always []) Clickable
+    viewGame model (viewControlBoard model)
 
 
-ongoing : Model -> (GameOngoingModel -> Model) -> Model
-ongoing model f =
-    case model of
-        GameOver _ ->
-            model
 
-        GameOngoing m ->
-            f m
+-- UPDATE
 
 
-update : Msg -> Model -> Model
+delayPlay : Board -> Player -> Cmd Msg
+delayPlay b p =
+    delay 1000 (computeNextMove b p)
+
+
+getMove : GameOptions -> Board -> Player -> ( GameState, Cmd Msg )
+getMove options board player =
+    if isControlledBy Human options player then
+        ( OnGoing player, Cmd.none )
+
+    else
+        ( WaitingFor player, delay 1000 (computeNextMove board player) )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Restart ->
-            init
+            let
+                ( state, cmd ) =
+                    getMove model.options emptyBoard player1
+            in
+            ( { model | board = emptyBoard, state = state }, cmd )
 
-        Surrender ->
-            ongoing model <|
-                \m ->
-                    GameOver { board = m.board, state = Surrendered m.currentPlayer }
+        Surrendered player ->
+            ( { model | state = Surrender player }, Cmd.none )
 
-        PlayAt pos ->
-            ongoing model <|
-                \m ->
-                    case play m.board pos m.currentPlayer of
-                        Nothing ->
-                            model
+        OptionChanged options ->
+            ( { model | options = options }, Cmd.none )
 
-                        Just board ->
-                            case gameState board of
-                                OnGoing ->
-                                    GameOngoing { board = board, currentPlayer = nextPlayer m.currentPlayer }
+        PlayedAt pos player ->
+            if not (isRunning model.state) then
+                ( model, Cmd.none )
 
-                                state ->
-                                    GameOver { board = board, state = state }
+            else
+                case play model.board pos player of
+                    Nothing ->
+                        ( model, Cmd.none )
+
+                    Just board ->
+                        case gameState board player of
+                            Left v ->
+                                ( { model | board = board, state = Won v }, Cmd.none )
+
+                            Right positions ->
+                                let
+                                    next =
+                                        nextPlayer player
+
+                                    ( state, cmd ) =
+                                        if List.isEmpty positions then
+                                            ( Draw, Cmd.none )
+
+                                        else
+                                            getMove model.options board next
+                                in
+                                ( { model | board = board, state = state }, cmd )
+
+
+
+-- INIT
 
 
 init : Model
 init =
-    GameOngoing { board = emptyBoard, currentPlayer = player1 }
+    { options = defaultOptions, board = emptyBoard, state = Stopped, expectingRemotePlay = False }
 
 
-gameStateToString : GameState -> String
-gameStateToString state =
-    case state of
-        Won ( _, Player i ) ->
-            "Player " ++ String.fromInt i ++ " has won!"
-
-        Draw ->
-            "It's a draw!"
-
-        OnGoing ->
-            "The game is not over yet"
-
-        Surrendered (Player i) ->
-            "Player " ++ String.fromInt i ++ " surrendered..."
+defaultOptions : GameOptions
+defaultOptions =
+    GameOptions ( { symbol = 'X', controller = Human }, { symbol = 'O', controller = Computer } )
 
 
-playerTurnText : Player -> String
-playerTurnText (Player i) =
-    "It is player " ++ String.fromInt i ++ "'s turn to play."
+emptyBoard : Board
+emptyBoard =
+    List.repeat 9 EmptyCell |> List.indexedMap Tuple.pair |> Dict.fromList |> Board
 
 
-refSize : Float
-refSize =
-    15
 
-
-boardSize : Em
-boardSize =
-    em refSize
-
-
-cellSize : Em
-cellSize =
-    em (refSize / 3)
+-- STYLES
 
 
 tableStyle : Attribute Msg
@@ -429,6 +635,7 @@ tableStyle =
         , height boardSize
         , border2 (px 1) solid
         , borderSpacing (px 0)
+        , margin auto
         ]
 
 
@@ -454,6 +661,13 @@ winningCellStyle =
     ]
 
 
+buttonDivStyle : Attribute Msg
+buttonDivStyle =
+    css
+        [ margin (px 5)
+        ]
+
+
 winningGreen : Color
 winningGreen =
     hex "2c962f"
@@ -467,3 +681,18 @@ white =
 black : Color
 black =
     hex "000000"
+
+
+refSize : Float
+refSize =
+    15
+
+
+boardSize : Em
+boardSize =
+    em refSize
+
+
+cellSize : Em
+cellSize =
+    em (refSize / 3)
