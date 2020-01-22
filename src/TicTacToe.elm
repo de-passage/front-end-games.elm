@@ -2,9 +2,10 @@ module TicTacToe exposing (Model, Msg(..), init, update, view)
 
 import Css exposing (..)
 import Dict exposing (Dict)
+import Html.Events.Extra as Events
 import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, table, tbody, td, text, tr)
 import Html.Styled.Attributes exposing (checked, css, name, type_)
-import Html.Styled.Events exposing (onClick, onInput)
+import Html.Styled.Events exposing (onClick)
 import List.Extra as List
 import Maybe.Extra as Maybe
 import Process
@@ -97,6 +98,11 @@ type alias Victory =
 
 
 -- UTILITIES
+
+
+onChange : (String -> msg) -> Attribute msg
+onChange =
+    Html.Styled.Attributes.fromUnstyled << Events.onChange
 
 
 isRunning : GameState -> Bool
@@ -268,10 +274,6 @@ type alias Score =
     Int
 
 
-type alias Move =
-    ( Position, Depth )
-
-
 defeat : Score
 defeat =
     -(2 ^ 32)
@@ -328,12 +330,30 @@ minMax board player position depth =
                         ( -opponentScore, opponentDepth )
 
 
-{-| Gets the fastest move to victory. Returns the pair of the score of the best moves and the list of
-corresponding positions on the board. If there is no available move, returns (draw, [])
--}
 bestMove : Board -> Player -> Depth -> ( Score, Depth, Position )
 bestMove board player depth =
-    List.foldl (aggregate board player depth) ( defeat, 0, Position 0 ) (availablePositions board)
+    let
+        foundVictory ( v, _, _ ) =
+            v == victory
+
+        scFold f p acc l =
+            List.uncons l
+                |> Maybe.map
+                    (\( h, t ) ->
+                        let
+                            fh =
+                                f h acc
+                        in
+                        if p fh then
+                            fh
+
+                        else
+                            scFold f p fh t
+                    )
+                |> Maybe.withDefault acc
+    in
+    -- was originally using List.foldl but the evaluation wouldn't short circuit and cause performance problems because of all the recursion
+    scFold (aggregate board player depth) foundVictory ( defeat, 0, Position 0 ) (availablePositions board)
 
 
 aggregate : Board -> Player -> Depth -> Position -> ( Score, Depth, Position ) -> ( Score, Depth, Position )
@@ -465,8 +485,8 @@ gameStateToViewElements state =
             ( "Player " ++ String.fromInt i ++ " is thinking.", Restart, "Restart" )
 
 
-controllerSelection : Model -> String -> Player -> Html Msg
-controllerSelection model lbl player =
+controllerSelection : Model -> String -> String -> Player -> Html Msg
+controllerSelection model id lbl player =
     let
         p f =
             f model.options player
@@ -478,7 +498,7 @@ controllerSelection model lbl player =
             p (isControlledBy c)
 
         mkRadio n c =
-            radio n lbl (isCtrldBy c) (setOpts c)
+            radio n id (isCtrldBy c) (setOpts c)
     in
     Html.Styled.fieldset []
         [ label [] [ text lbl ]
@@ -490,7 +510,7 @@ controllerSelection model lbl player =
 radio : String -> String -> Bool -> Msg -> Html Msg
 radio value group isChecked msg =
     label []
-        [ input [ type_ "radio", name group, onInput (always msg), checked isChecked ] []
+        [ input [ type_ "radio", name group, onChange (always msg), checked isChecked ] []
         , text value
         ]
 
@@ -503,8 +523,8 @@ viewControlBoard model =
 
         controls =
             if not (isRunning model.state) then
-                [ controllerSelection model "Player 1" player1
-                , controllerSelection model "Player 2" player2
+                [ controllerSelection model "p1" "Player 1" player1
+                , controllerSelection model "p2" "Player 2" player2
                 ]
 
             else
@@ -546,47 +566,48 @@ getMove options board player =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        Restart ->
-            let
-                ( state, cmd ) =
-                    getMove model.options emptyBoard player1
-            in
-            ( { model | board = emptyBoard, state = state }, cmd )
+    Debug.log "update" <|
+        case msg of
+            Restart ->
+                let
+                    ( state, cmd ) =
+                        getMove model.options emptyBoard player1
+                in
+                ( { model | board = emptyBoard, state = state }, cmd )
 
-        Surrendered player ->
-            ( { model | state = Surrender player }, Cmd.none )
+            Surrendered player ->
+                ( { model | state = Surrender player }, Cmd.none )
 
-        OptionChanged options ->
-            ( { model | options = options }, Cmd.none )
+            OptionChanged options ->
+                ( { model | options = options }, Cmd.none )
 
-        PlayedAt pos player ->
-            if not (isRunning model.state) then
-                ( model, Cmd.none )
+            PlayedAt pos player ->
+                if not (isRunning model.state) then
+                    ( model, Cmd.none )
 
-            else
-                case play model.board pos player of
-                    Nothing ->
-                        ( model, Cmd.none )
+                else
+                    case play model.board pos player of
+                        Nothing ->
+                            ( model, Cmd.none )
 
-                    Just board ->
-                        case gameState board player of
-                            Left v ->
-                                ( { model | board = board, state = Won v }, Cmd.none )
+                        Just board ->
+                            case gameState board player of
+                                Left v ->
+                                    ( { model | board = board, state = Won v }, Cmd.none )
 
-                            Right positions ->
-                                let
-                                    next =
-                                        nextPlayer player
+                                Right positions ->
+                                    let
+                                        next =
+                                            nextPlayer player
 
-                                    ( state, cmd ) =
-                                        if List.isEmpty positions then
-                                            ( Draw, Cmd.none )
+                                        ( state, cmd ) =
+                                            if List.isEmpty positions then
+                                                ( Draw, Cmd.none )
 
-                                        else
-                                            getMove model.options board next
-                                in
-                                ( { model | board = board, state = state }, cmd )
+                                            else
+                                                getMove model.options board next
+                                    in
+                                    ( { model | board = board, state = state }, cmd )
 
 
 
