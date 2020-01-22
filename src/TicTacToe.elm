@@ -290,17 +290,11 @@ draw =
 computeNextMove : Board -> Player -> Msg
 computeNextMove board player =
     -- compute the list of best moves from the current board for the current player
-    bestMoves board player 0
-        -- extract the list of positions from the next move
-        |> Tuple.second
-        -- get the one with minimum depth (fastest victory)
-        |> List.minimumBy Tuple.second
-        -- take the position
-        |> Maybe.map Tuple.first
-        -- create a message to play a this position
-        |> Maybe.map (\p -> PlayedAt p player)
-        -- if we failed at any point (shouldn't happen if the algo is correct), give up
-        |> Maybe.withDefault (Surrendered player)
+    let
+        ( _, _, position ) =
+            bestMove board player 0
+    in
+    PlayedAt position player
 
 
 {-| Computes the score of a the best outcome of a given move on a given board by a given player. A higher score means
@@ -328,40 +322,31 @@ minMax board player position depth =
                         -- the game goes on
                         let
                             -- get the best move of the opponent
-                            ( opponentScore, opponentMoves ) =
-                                bestMoves boardAtNextMove (nextPlayer player) depth
+                            ( opponentScore, opponentDepth, _ ) =
+                                bestMove boardAtNextMove (nextPlayer player) depth
                         in
-                        opponentMoves
-                            |> List.map Tuple.second
-                            -- we do not care about the exact move, only what the best path to victory is
-                            |> List.minimum
-                            |> Maybe.map (\d -> ( opponentScore, d ))
-                            -- failed because no element in the list == draw
-                            |> Maybe.withDefault ( draw, depth )
+                        ( -opponentScore, opponentDepth )
 
 
 {-| Gets the fastest move to victory. Returns the pair of the score of the best moves and the list of
 corresponding positions on the board. If there is no available move, returns (draw, [])
 -}
-bestMoves : Board -> Player -> Depth -> ( Score, List Move )
-bestMoves board player depth =
-    List.foldl (aggregate board player depth) ( defeat, [] ) (availablePositions board)
+bestMove : Board -> Player -> Depth -> ( Score, Depth, Position )
+bestMove board player depth =
+    List.foldl (aggregate board player depth) ( defeat, 0, Position 0 ) (availablePositions board)
 
 
-aggregate : Board -> Player -> Depth -> Position -> ( Score, List Move ) -> ( Score, List Move )
-aggregate board player depth position ( currentMax, possibilities ) =
+aggregate : Board -> Player -> Depth -> Position -> ( Score, Depth, Position ) -> ( Score, Depth, Position )
+aggregate board player depth position ( currentMax, currentDepth, currentPosition ) =
     let
         ( moveValue, moveDepth ) =
             minMax board player position (depth + 1)
     in
-    if moveValue > currentMax then
-        ( moveValue, [ ( position, moveDepth ) ] )
-
-    else if moveValue == currentMax then
-        ( currentMax, ( position, moveDepth ) :: possibilities )
+    if (moveValue > currentMax) || (moveValue == currentMax && moveDepth < currentDepth) then
+        ( moveValue, moveDepth, position )
 
     else
-        ( currentMax, possibilities )
+        ( currentMax, currentDepth, currentPosition )
 
 
 
