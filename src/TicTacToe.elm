@@ -221,21 +221,14 @@ availablePositions (Board cells) =
         |> List.map (Tuple.first >> Position)
 
 
-allSamePlayer : Dict Int Cell -> Player -> List Int -> Maybe (List Position)
+allSamePlayer : Dict Int Cell -> Player -> List Int -> Bool
 allSamePlayer dict player pos =
     let
         players =
-            Maybe.combine <| List.map (\i -> Dict.get i dict |> Maybe.andThen cellPlayer) pos
+            List.map (\i -> Dict.get i dict |> Maybe.andThen cellPlayer) pos
     in
     players
-        |> Maybe.andThen
-            (\l ->
-                if List.all (samePlayer player) l then
-                    Just (List.map Position pos)
-
-                else
-                    Nothing
-            )
+        |> List.all (Maybe.map (samePlayer player) >> Maybe.withDefault False)
 
 
 winConditions : List (List Int)
@@ -255,10 +248,8 @@ nextPlayer player =
 gameState : Board -> Player -> VictoryStatus
 gameState (Board cells) player =
     winConditions
-        |> List.map (allSamePlayer cells player)
-        |> List.find Maybe.isJust
-        |> Maybe.join
-        |> Maybe.map (\p -> Left ( p, player ))
+        |> List.find (allSamePlayer cells player)
+        |> Maybe.map (\p -> Left ( List.map Position p, player ))
         |> Maybe.withDefault (Right (availablePositions (Board cells)))
 
 
@@ -303,31 +294,25 @@ computeNextMove board player =
 better chances of victory. The depth given in second position is the number of moves needed to
 reach the best computed outcome. Invalid moves return (draw, 0).
 -}
-minMax : Board -> Player -> Position -> Depth -> ( Score, Depth )
+minMax : Board -> Player -> Position -> Depth -> ( Score, Depth, Position )
 minMax board player position depth =
     case play board position player of
         -- garbage in, garbage out
         Nothing ->
-            ( draw, 0 )
+            ( draw, 0, position )
 
         Just boardAtNextMove ->
             case gameState boardAtNextMove player of
                 -- we won
                 Left _ ->
-                    ( victory, depth )
+                    ( victory, depth, position )
 
                 Right status ->
                     if List.isEmpty status then
-                        ( draw, 0 )
+                        ( draw, 0, position )
 
                     else
-                        -- the game goes on
-                        let
-                            -- get the best move of the opponent
-                            ( opponentScore, opponentDepth, _ ) =
-                                bestMove boardAtNextMove (nextPlayer player) depth
-                        in
-                        ( -opponentScore, opponentDepth )
+                        bestMove boardAtNextMove (nextPlayer player) depth 
 
 
 bestMove : Board -> Player -> Depth -> ( Score, Depth, Position )
@@ -335,6 +320,8 @@ bestMove board player depth =
     let
         foundVictory ( v, _, _ ) =
             v == victory
+
+        negFirst (v, x ,y) = (negate v, x ,y)
 
         scFold f p acc l =
             List.uncons l
@@ -345,12 +332,12 @@ bestMove board player depth =
                                 f h acc
                         in
                         if p fh then
-                            fh
+                            negFirst fh
 
                         else
                             scFold f p fh t
                     )
-                |> Maybe.withDefault acc
+                |> Maybe.withDefault (negFirst acc)
     in
     -- was originally using List.foldl but the evaluation wouldn't short circuit and cause performance problems because of all the recursion
     scFold (aggregate board player depth) foundVictory ( defeat, 0, Position 0 ) (availablePositions board)
@@ -359,8 +346,8 @@ bestMove board player depth =
 aggregate : Board -> Player -> Depth -> Position -> ( Score, Depth, Position ) -> ( Score, Depth, Position )
 aggregate board player depth position ( currentMax, currentDepth, currentPosition ) =
     let
-        ( moveValue, moveDepth ) =
-            minMax board player position (depth + 1)
+        ( moveValue, moveDepth, _ ) =
+            minMax board player position depth
     in
     if (moveValue > currentMax) || (moveValue == currentMax && moveDepth < currentDepth) then
         ( moveValue, moveDepth, position )
@@ -550,11 +537,6 @@ view model =
 -- UPDATE
 
 
-delayPlay : Board -> Player -> Cmd Msg
-delayPlay b p =
-    delay 1000 (computeNextMove b p)
-
-
 getMove : GameOptions -> Board -> Player -> ( GameState, Cmd Msg )
 getMove options board player =
     if isControlledBy Human options player then
@@ -566,48 +548,47 @@ getMove options board player =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    Debug.log "update" <|
-        case msg of
-            Restart ->
-                let
-                    ( state, cmd ) =
-                        getMove model.options emptyBoard player1
-                in
-                ( { model | board = emptyBoard, state = state }, cmd )
+    case msg of
+        Restart ->
+            let
+                ( state, cmd ) =
+                    getMove model.options emptyBoard player1
+            in
+            ( { model | board = emptyBoard, state = state }, cmd )
 
-            Surrendered player ->
-                ( { model | state = Surrender player }, Cmd.none )
+        Surrendered player ->
+            ( { model | state = Surrender player }, Cmd.none )
 
-            OptionChanged options ->
-                ( { model | options = options }, Cmd.none )
+        OptionChanged options ->
+            ( { model | options = options }, Cmd.none )
 
-            PlayedAt pos player ->
-                if not (isRunning model.state) then
-                    ( model, Cmd.none )
+        PlayedAt pos player ->
+            if not (isRunning model.state) then
+                ( model, Cmd.none )
 
-                else
-                    case play model.board pos player of
-                        Nothing ->
-                            ( model, Cmd.none )
+            else
+                case play model.board pos player of
+                    Nothing ->
+                        ( model, Cmd.none )
 
-                        Just board ->
-                            case gameState board player of
-                                Left v ->
-                                    ( { model | board = board, state = Won v }, Cmd.none )
+                    Just board ->
+                        case gameState board player of
+                            Left v ->
+                                ( { model | board = board, state = Won v }, Cmd.none )
 
-                                Right positions ->
-                                    let
-                                        next =
-                                            nextPlayer player
+                            Right positions ->
+                                let
+                                    next =
+                                        nextPlayer player
 
-                                        ( state, cmd ) =
-                                            if List.isEmpty positions then
-                                                ( Draw, Cmd.none )
+                                    ( state, cmd ) =
+                                        if List.isEmpty positions then
+                                            ( Draw, Cmd.none )
 
-                                            else
-                                                getMove model.options board next
-                                    in
-                                    ( { model | board = board, state = state }, cmd )
+                                        else
+                                            getMove model.options board next
+                                in
+                                ( { model | board = board, state = state }, cmd )
 
 
 
