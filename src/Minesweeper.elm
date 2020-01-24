@@ -149,10 +149,6 @@ reservoirSample n source =
         next i x =
             randomF |> Random.map (\r -> 1 + i + floor (logBase e r / logBase e (1 - x)))
 
-        randomI : Random.Generator Int
-        randomI =
-            Random.int 0 (n - 1)
-
         repl i list k =
             Array.get i source
                 |> Maybe.map (\e -> Array.set k e list)
@@ -164,7 +160,7 @@ reservoirSample n source =
                 Random.constant list
 
             else
-                randomI
+                Random.int 0 (n - 1)
                     |> Random.andThen
                         (\k ->
                             next i x
@@ -183,7 +179,7 @@ reservoirSample n source =
             |> Random.map
                 (\i ->
                     Array.get i source
-                        |> Maybe.map (\x -> Array.fromList [x])
+                        |> Maybe.map (\x -> Array.fromList [ x ])
                         |> Maybe.withDefault Array.empty
                 )
 

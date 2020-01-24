@@ -24,6 +24,11 @@ type GameModel
     | Minesweeper MS.Model
 
 
+type GameTag
+    = TicTacToeT
+    | MinesweeperT
+
+
 type alias Model =
     { gameModel : GameModel
     }
@@ -44,33 +49,73 @@ type ExtMsg
 
 type Msg
     = ExternalMessage ExtMsg
-    | GameChanged GameModel
+    | GameChanged GameTag
 
 
-dispatch :
+initialGame : GameTag -> GameModel
+initialGame tag =
+    case tag of
+        MinesweeperT ->
+            Minesweeper MS.init
+
+        TicTacToeT ->
+            TicTacToe TTT.init
+
+
+dispatchUpdate :
     ExtMsg
-    -> Model
+    -> GameModel
     -> a
     -> (TTT.Msg -> TTT.Model -> a)
     -> (MS.Msg -> MS.Model -> a)
     -> a
-dispatch msg model default ttt ms =
+dispatchUpdate msg model default ttt ms =
     case msg of
         TicTacToeMsg msg1 ->
-            case model.gameModel of
-                TicTacToe model1 ->
-                    ttt msg1 model1
-
-                _ ->
-                    default
+            tictactoe default (ttt msg1) model
 
         MinesweeperMsg msg1 ->
-            case model.gameModel of
-                Minesweeper model1 ->
-                    ms msg1 model1
+            minesweeper default (ms msg1) model
 
-                _ ->
-                    default
+
+dispatchGame : (TTT.Model -> a) -> (MS.Model -> a) -> GameModel -> a
+dispatchGame ttt ms game =
+    case game of
+        TicTacToe m ->
+            ttt m
+
+        Minesweeper m ->
+            ms m
+
+
+minesweeper : a -> (MS.Model -> a) -> GameModel -> a
+minesweeper default =
+    dispatchGame (always default)
+
+
+tictactoe : a -> (TTT.Model -> a) -> GameModel -> a
+tictactoe default f =
+    dispatchGame f (always default)
+
+
+tictacttoeTag : TTT.Model -> GameTag
+tictacttoeTag =
+    always TicTacToeT
+
+
+minesweeperTag : MS.Model -> GameTag
+minesweeperTag =
+    always MinesweeperT
+
+
+gameType : GameModel -> GameTag
+gameType =
+    dispatchGame tictacttoeTag minesweeperTag
+
+
+isGame : GameTag -> GameModel -> Bool
+isGame tag model =
+    tag == gameType model
 
 
 mapUpdate :
@@ -109,13 +154,12 @@ updateMS =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of 
+    case msg of
         ExternalMessage msg1 ->
-            dispatch msg1 model ( model, Cmd.none ) (updateTTT model) (updateMS model)
+            dispatchUpdate msg1 model.gameModel ( model, Cmd.none ) (updateTTT model) (updateMS model)
 
         GameChanged newGame ->
-            ( {model | gameModel = newGame }, Cmd.none )
-        
+            ( { model | gameModel = initialGame newGame }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -136,22 +180,27 @@ tabsFor : Model -> Html Msg
 tabsFor model =
     let
         games =
-            [ ( "Minesweeper", Minesweeper MS.init )
-            , ( "TicTacToe", TicTacToe TTT.init )
+            [ ( "Minesweeper", MinesweeperT )
+            , ( "TicTacToe", TicTacToeT )
             ]
 
-        style =
-            [ displayFlex ]
+        tabStyle tag =
+            let
+                additional =
+                    if isGame tag model.gameModel then
+                        basicTabStyle ++ selectedStyle
 
-        tabStyle =
-            []
+                    else
+                        basicTabStyle
+            in
+            marginRight (px 10) :: additional
 
-        mkDiv ( name, initModel ) =
-            div [ css tabStyle, onClick (GameChanged initModel) ] [ text name ]
+        mkDiv ( name, tag ) =
+            div [ css (tabStyle tag), onClick (GameChanged tag) ] [ text name ]
     in
     games
         |> List.map mkDiv
-        |> div [ css style ]
+        |> div [ css tabHeaderStyle ]
 
 
 tabed : Model -> Html Msg
@@ -172,3 +221,80 @@ gameView m =
         Minesweeper model ->
             div []
                 [ text "Minesweeper", Html.map (MinesweeperMsg >> ExternalMessage) (MS.view model) ]
+
+
+
+-- CSS STYLING
+
+
+white : Color
+white =
+    rgb 255 255 255
+
+
+black : Color
+black =
+    rgb 0 0 0
+
+
+selectedBgColor : Color
+selectedBgColor =
+    rgb 57 119 219
+
+
+selectedTextColor : Color
+selectedTextColor =
+    white
+
+
+tabBorderColor : Color
+tabBorderColor =
+    rgb 10 15 148
+
+
+tabBorder : Color -> Style
+tabBorder c =
+    let
+        size =
+            px 3
+
+        style =
+            solid
+
+        b f = f size style c
+    in
+    Css.batch [ b borderTop3, b borderLeft3, b borderRight3 ]
+
+
+selectedStyle : List Style
+selectedStyle =
+    [ backgroundColor selectedBgColor
+    , color selectedTextColor
+    , tabBorderArc
+    , tabBorder selectedBgColor
+    ]
+
+
+tabBorderArc : Style
+tabBorderArc =
+    borderRadius4 (Css.em 0.8) (Css.em 0.8) (Css.em 0) (Css.em 0)
+
+
+tabHeaderStyle : List Style
+tabHeaderStyle =
+    [ displayFlex
+    , marginBottom (Css.em 1)
+    , borderBottom2 (px 1) solid
+    , lineHeight (Css.em 2.5)
+    , flexWrap Css.wrap
+    ]
+
+
+basicTabStyle : List Style
+basicTabStyle =
+    [ cursor pointer
+    , tabBorder white
+    , tabBorderArc
+    , padding2 (px 0) (px 10)
+    , hover [ tabBorder tabBorderColor ]
+    ]
