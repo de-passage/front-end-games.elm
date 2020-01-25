@@ -1,7 +1,8 @@
 module TicTacToe exposing (Model, Msg(..), init, update, view)
 
-import Css exposing (..)
 import Array exposing (Array)
+import Css exposing (..)
+import Defered exposing (..)
 import Html.Events.Extra as Events
 import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, table, tbody, td, text, tr)
 import Html.Styled.Attributes exposing (checked, css, name, type_)
@@ -11,12 +12,12 @@ import Maybe.Extra as Maybe
 import Process
 import Task
 import Tuple
-import Defered exposing (..)
 
 
 type Either a b
     = Left a
     | Right b
+
 
 type Player
     = Player Int
@@ -215,10 +216,11 @@ play (Board cells) (Position i) player =
 
 availablePositions : Board -> List Position
 availablePositions (Board cells) =
-    let 
-        positions = Array.toIndexedList cells
+    let
+        positions =
+            Array.toIndexedList cells
     in
-        positions 
+    positions
         |> List.filter (Tuple.second >> isEmpty)
         |> List.map (Tuple.first >> Position)
 
@@ -291,12 +293,12 @@ computeNextMove : Board -> Player -> Msg
 computeNextMove board player =
     -- compute the list of best moves from the current board for the current player
     let
-        getPosition b p = 
-            let 
+        getPosition b p =
+            let
                 ( _, _, position ) =
-                 bestMove board player 0
-            in 
-                position
+                    bestMove board player 0
+            in
+            position
     in
     PlayedAt (defer2 getPosition board player) player
 
@@ -326,33 +328,35 @@ minMax board player position depth =
                         bestMove boardAtNextMove (nextPlayer player) depth
 
 
+foundVictory : ( Score, a, b ) -> Bool
 foundVictory ( v, _, _ ) =
     v == victory
 
 
+negFirst : ( Score, a, b ) -> ( Score, a, b )
 negFirst ( v, x, y ) =
     ( negate v, x, y )
 
 
-scFold f p acc l =
-    case l of
-        [] ->
-            negFirst acc
-
-        h :: t ->
-            let
-                fh =
-                    f h acc
-            in
-            if p fh then
-                negFirst fh
-
-            else
-                scFold f p fh t
-
-
 bestMove : Board -> Player -> Depth -> ( Score, Depth, Position )
 bestMove board player depth =
+    let
+        scFold f p acc l =
+            case l of
+                [] ->
+                    negFirst acc
+
+                h :: t ->
+                    let
+                        fh =
+                            f h acc
+                    in
+                    if p fh then
+                        negFirst fh
+
+                    else
+                        scFold f p fh t
+    in
     -- was originally using List.foldl but the evaluation wouldn't short circuit and cause performance problems because of all the recursion
     scFold (aggregate board player depth) foundVictory ( defeat, 0, Position 0 ) (availablePositions board)
 
@@ -609,9 +613,9 @@ update msg model =
 -- INIT
 
 
-init : Model
+init : (Model, Cmd msg)
 init =
-    { options = defaultOptions, board = emptyBoard, state = Stopped, expectingRemotePlay = False }
+    ({ options = defaultOptions, board = emptyBoard, state = Stopped, expectingRemotePlay = False }, Cmd.none)
 
 
 defaultOptions : GameOptions

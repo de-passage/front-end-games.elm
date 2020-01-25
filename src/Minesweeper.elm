@@ -101,9 +101,9 @@ update message model =
             ( model, Cmd.none )
 
 
-init : Model
+init : (Model, Cmd Msg)
 init =
-    { cells =
+    ({ cells =
         Dict.fromList
             [ ( ( 0, 0 ), Mine )
             , ( ( 0, 1 ), Empty )
@@ -122,7 +122,7 @@ init =
     , min = 0
     , max = 100
     , count = 10
-    }
+    }, Cmd.none)
 
 
 {-| Adapted from wikipedia <https://en.wikipedia.org/wiki/Reservoir_sampling>

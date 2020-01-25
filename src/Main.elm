@@ -2,12 +2,12 @@ module Main exposing (Model, Msg, init, main, subscriptions, update, view)
 
 import Browser
 import Css exposing (..)
+import Function
 import Html.Styled as Html exposing (..)
 import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
 import Minesweeper as MS
 import TicTacToe as TTT
-import Function
 
 
 main : Program () Model Msg
@@ -37,10 +37,29 @@ type alias Model =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { gameModel = TicTacToe TTT.init
+    let
+        ( model, command ) =
+            TTT.init
+    in
+    ( { gameModel = TicTacToe model
       }
-    , Cmd.none
+    , toTTTCmd command
     )
+
+
+adaptCmd : (msg -> ExtMsg) -> Cmd msg -> Cmd Msg
+adaptCmd f =
+    Cmd.map (f >> ExternalMessage)
+
+
+toTTTCmd : Cmd TTT.Msg -> Cmd Msg
+toTTTCmd =
+    adaptCmd TicTacToeMsg
+
+
+toMSCmd : Cmd MS.Msg -> Cmd Msg
+toMSCmd =
+    adaptCmd MinesweeperMsg
 
 
 type ExtMsg
@@ -53,14 +72,14 @@ type Msg
     | GameChanged GameTag
 
 
-initialGame : GameTag -> GameModel
+initialGame : GameTag -> ( GameModel, Cmd Msg )
 initialGame tag =
     case tag of
         MinesweeperT ->
-            Minesweeper MS.init
+            MS.init |> Tuple.mapBoth Minesweeper toMSCmd
 
         TicTacToeT ->
-            TicTacToe TTT.init
+            TTT.init |> Tuple.mapBoth TicTacToe toTTTCmd
 
 
 dispatchUpdate :
@@ -152,20 +171,31 @@ updateMS :
 updateMS =
     mapUpdate MS.update MinesweeperMsg Minesweeper
 
-noCmd : a -> (a, Cmd msg)
-noCmd a = (a, Cmd.none)
+
+noCmd : a -> ( a, Cmd msg )
+noCmd a =
+    ( a, Cmd.none )
+
 
 getGame : Model -> GameModel
-getGame m = m.gameModel
+getGame m =
+    m.gameModel
+
+
+setGame : Model -> GameModel -> Model
+setGame m g =
+    { m | gameModel = g }
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ExternalMessage msg1 -> 
+        ExternalMessage msg1 ->
             Function.lift4 (dispatchUpdate msg1) noCmd updateTTT updateMS getGame <| model
 
         GameChanged newGame ->
-            ( { model | gameModel = initialGame newGame }, Cmd.none )
+            initialGame newGame
+                |> Tuple.mapFirst (setGame model)
 
 
 subscriptions : Model -> Sub Msg
@@ -201,10 +231,15 @@ tabsFor model =
             in
             marginRight (px 10) :: additional
 
-        onClickEvent tag = if not <| isGame tag model.gameModel then [onClick (GameChanged tag) ] else []
+        onClickEvent tag =
+            if not <| isGame tag model.gameModel then
+                [ onClick (GameChanged tag) ]
+
+            else
+                []
 
         mkDiv ( name, tag ) =
-            div (onClickEvent tag ++ [ css (tabStyle tag)]) [ text name ]
+            div (onClickEvent tag ++ [ css (tabStyle tag) ]) [ text name ]
     in
     games
         |> List.map mkDiv
@@ -269,7 +304,8 @@ tabBorder c =
         style =
             solid
 
-        b f = f size style c
+        b f =
+            f size style c
     in
     Css.batch [ b borderTop3, b borderLeft3, b borderRight3 ]
 
