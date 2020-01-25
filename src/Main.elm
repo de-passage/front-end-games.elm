@@ -201,8 +201,10 @@ tabsFor model =
             in
             marginRight (px 10) :: additional
 
+        onClickEvent tag = if not <| isGame tag model.gameModel then [onClick (GameChanged tag) ] else []
+
         mkDiv ( name, tag ) =
-            div [ css (tabStyle tag), onClick (GameChanged tag) ] [ text name ]
+            div (onClickEvent tag ++ [ css (tabStyle tag)]) [ text name ]
     in
     games
         |> List.map mkDiv
