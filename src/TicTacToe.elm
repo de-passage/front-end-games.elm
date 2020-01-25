@@ -1,7 +1,7 @@
 module TicTacToe exposing (Model, Msg(..), init, update, view)
 
 import Css exposing (..)
-import Dict exposing (Dict)
+import Array exposing (Array)
 import Html.Events.Extra as Events
 import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, table, tbody, td, text, tr)
 import Html.Styled.Attributes exposing (checked, css, name, type_)
@@ -38,7 +38,7 @@ type Cell
 
 
 type Board
-    = Board (Dict Int Cell)
+    = Board (Array Cell)
 
 
 type alias Model =
@@ -202,10 +202,10 @@ delay time msg =
 
 play : Board -> Position -> Player -> Maybe Board
 play (Board cells) (Position i) player =
-    case Dict.get i cells of
+    case Array.get i cells of
         Just EmptyCell ->
             cells
-                |> Dict.update i (Maybe.map <| always <| Played player)
+                |> Array.set i (Played player)
                 |> Board
                 |> Just
 
@@ -215,17 +215,19 @@ play (Board cells) (Position i) player =
 
 availablePositions : Board -> List Position
 availablePositions (Board cells) =
-    cells
-        |> Dict.toList
+    let 
+        positions = Array.toIndexedList cells
+    in
+        positions 
         |> List.filter (Tuple.second >> isEmpty)
         |> List.map (Tuple.first >> Position)
 
 
-allSamePlayer : Dict Int Cell -> Player -> List Int -> Bool
-allSamePlayer dict player pos =
+allSamePlayer : Board -> Player -> List Int -> Bool
+allSamePlayer (Board b) player pos =
     let
         players =
-            List.map (\i -> Dict.get i dict |> Maybe.andThen cellPlayer) pos
+            List.map (\i -> Array.get i b |> Maybe.andThen cellPlayer) pos
     in
     players
         |> List.all (Maybe.map (samePlayer player) >> Maybe.withDefault False)
@@ -246,13 +248,13 @@ nextPlayer player =
 
 
 gameState : Board -> Player -> VictoryStatus
-gameState (Board cells) player =
+gameState board player =
     case
         winConditions
-            |> List.find (allSamePlayer cells player)
+            |> List.find (allSamePlayer board player)
     of
         Nothing ->
-            Right (availablePositions (Board cells))
+            Right (availablePositions board)
 
         Just p ->
             Left ( List.map Position p, player )
@@ -376,7 +378,7 @@ boardAsTable : Board -> List (List IndexedCell)
 boardAsTable (Board cells) =
     let
         c =
-            Dict.toList cells |> List.map (\( i, cell ) -> ( Position i, cell ))
+            Array.toIndexedList cells |> List.map (\( i, cell ) -> ( Position i, cell ))
     in
     [ List.take 3 c
     , List.take 3 <| List.drop 3 c
@@ -619,7 +621,7 @@ defaultOptions =
 
 emptyBoard : Board
 emptyBoard =
-    List.repeat 9 EmptyCell |> List.indexedMap Tuple.pair |> Dict.fromList |> Board
+    Board (Array.initialize 9 (always EmptyCell))
 
 
 
