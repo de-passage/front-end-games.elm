@@ -11,12 +11,12 @@ import Maybe.Extra as Maybe
 import Process
 import Task
 import Tuple
+import Defered exposing (..)
 
 
 type Either a b
     = Left a
     | Right b
-
 
 type Player
     = Player Int
@@ -65,7 +65,7 @@ type Controller
 
 
 type Msg
-    = PlayedAt Position Player
+    = PlayedAt (Defered Position) Player
     | Restart
     | Surrendered Player
     | OptionChanged GameOptions
@@ -247,10 +247,15 @@ nextPlayer player =
 
 gameState : Board -> Player -> VictoryStatus
 gameState (Board cells) player =
-    winConditions
-        |> List.find (allSamePlayer cells player)
-        |> Maybe.map (\p -> Left ( List.map Position p, player ))
-        |> Maybe.withDefault (Right (availablePositions (Board cells)))
+    case
+        winConditions
+            |> List.find (allSamePlayer cells player)
+    of
+        Nothing ->
+            Right (availablePositions (Board cells))
+
+        Just p ->
+            Left ( List.map Position p, player )
 
 
 
@@ -284,10 +289,14 @@ computeNextMove : Board -> Player -> Msg
 computeNextMove board player =
     -- compute the list of best moves from the current board for the current player
     let
-        ( _, _, position ) =
-            bestMove board player 0
+        getPosition b p = 
+            let 
+                ( _, _, position ) =
+                 bestMove board player 0
+            in 
+                position
     in
-    PlayedAt position player
+    PlayedAt (defer2 getPosition board player) player
 
 
 {-| Computes the score of a the best outcome of a given move on a given board by a given player. A higher score means
@@ -312,33 +321,36 @@ minMax board player position depth =
                         ( draw, 0, position )
 
                     else
-                        bestMove boardAtNextMove (nextPlayer player) depth 
+                        bestMove boardAtNextMove (nextPlayer player) depth
+
+
+foundVictory ( v, _, _ ) =
+    v == victory
+
+
+negFirst ( v, x, y ) =
+    ( negate v, x, y )
+
+
+scFold f p acc l =
+    case l of
+        [] ->
+            negFirst acc
+
+        h :: t ->
+            let
+                fh =
+                    f h acc
+            in
+            if p fh then
+                negFirst fh
+
+            else
+                scFold f p fh t
 
 
 bestMove : Board -> Player -> Depth -> ( Score, Depth, Position )
 bestMove board player depth =
-    let
-        foundVictory ( v, _, _ ) =
-            v == victory
-
-        negFirst (v, x ,y) = (negate v, x ,y)
-
-        scFold f p acc l =
-            List.uncons l
-                |> Maybe.map
-                    (\( h, t ) ->
-                        let
-                            fh =
-                                f h acc
-                        in
-                        if p fh then
-                            negFirst fh
-
-                        else
-                            scFold f p fh t
-                    )
-                |> Maybe.withDefault (negFirst acc)
-    in
     -- was originally using List.foldl but the evaluation wouldn't short circuit and cause performance problems because of all the recursion
     scFold (aggregate board player depth) foundVictory ( defeat, 0, Position 0 ) (availablePositions board)
 
@@ -395,7 +407,7 @@ viewCell model cell =
         EmptyCell ->
             case model.state of
                 OnGoing player ->
-                    styledTd [ onClick (PlayedAt (cellPosition cell) player) ] []
+                    styledTd [ onClick (PlayedAt (defer cellPosition cell) player) ] []
 
                 _ ->
                     styledTd [] []
@@ -567,7 +579,7 @@ update msg model =
                 ( model, Cmd.none )
 
             else
-                case play model.board pos player of
+                case play model.board (eval pos) player of
                     Nothing ->
                         ( model, Cmd.none )
 

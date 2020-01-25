@@ -7,6 +7,7 @@ import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
 import Minesweeper as MS
 import TicTacToe as TTT
+import Function
 
 
 main : Program () Model Msg
@@ -64,18 +65,18 @@ initialGame tag =
 
 dispatchUpdate :
     ExtMsg
-    -> GameModel
     -> a
     -> (TTT.Msg -> TTT.Model -> a)
     -> (MS.Msg -> MS.Model -> a)
+    -> GameModel
     -> a
-dispatchUpdate msg model default ttt ms =
+dispatchUpdate msg default ttt ms =
     case msg of
         TicTacToeMsg msg1 ->
-            tictactoe default (ttt msg1) model
+            tictactoe default (ttt msg1)
 
         MinesweeperMsg msg1 ->
-            minesweeper default (ms msg1) model
+            minesweeper default (ms msg1)
 
 
 dispatchGame : (TTT.Model -> a) -> (MS.Model -> a) -> GameModel -> a
@@ -151,12 +152,17 @@ updateMS :
 updateMS =
     mapUpdate MS.update MinesweeperMsg Minesweeper
 
+noCmd : a -> (a, Cmd msg)
+noCmd a = (a, Cmd.none)
+
+getGame : Model -> GameModel
+getGame m = m.gameModel
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ExternalMessage msg1 ->
-            dispatchUpdate msg1 model.gameModel ( model, Cmd.none ) (updateTTT model) (updateMS model)
+        ExternalMessage msg1 -> 
+            Function.lift4 (dispatchUpdate msg1) noCmd updateTTT updateMS getGame <| model
 
         GameChanged newGame ->
             ( { model | gameModel = initialGame newGame }, Cmd.none )
