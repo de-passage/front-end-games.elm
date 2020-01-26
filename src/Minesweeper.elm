@@ -11,6 +11,8 @@ import Html.Styled.Events exposing (onClick, preventDefaultOn)
 import Json.Decode as Json
 import Random
 import Wrapped as W exposing (..)
+import List.Extra as List
+import Maybe.Extra as Maybe
 
 
 onChange =
@@ -61,8 +63,8 @@ type Msg
     = PlayedAt X Y
     | Flagged X Y
     | Restart
-    | RequestedNewList
-    | NewListGenerated (Array Int)
+    | RequestedNewList X Y
+    | NewListGenerated X Y (Array Int)
     | HeightChanged BoardHeight
     | WidthChanged BoardWidth
     | MineCountChanged MineCount
@@ -168,23 +170,10 @@ mineInput =
 countAdj : X -> Y -> BoardWidth -> BoardHeight -> Board -> Int
 countAdj x y w h board =
     let
-        xp1 =
-            W.succ x
+        check = getAdjacent x y w h
 
-        xm1 =
-            W.pred x
-
-        yp1 =
-            W.succ y
-
-        ym1 =
-            W.pred y
-
-        check =
-            [ ( xm1, ym1 ), ( xm1, y ), ( xm1, yp1 ), ( x, ym1 ), ( x, yp1 ), ( xp1, ym1 ), ( xp1, y ), ( xp1, yp1 ) ]
-
-        cellValue ( a, b ) =
-            case W.lift (Array.get (atCell a b w h)) board of
+        cellValue ( _, _, i ) =
+            case W.lift (Array.get i) board of
                 Nothing ->
                     Empty
 
@@ -256,19 +245,23 @@ viewCell model x y (Cell cont visi) =
                 ([], white)
 
         actions =
-            if model.status == Ongoing then
-                let
-                    style =
-                        if visi == Revealed then
-                            [ cursor default ]
+            case model.status of
+                Ongoing ->
+                    let
+                        style =
+                            if visi == Revealed then
+                                [ cursor default ]
 
-                        else
-                            [ cursor pointer ]
-                in
-                [ onClick (PlayedAt x y), onRightClick (Flagged x y), css style ]
+                            else
+                                [ cursor pointer ]
+                    in
+                    [ onClick (PlayedAt x y), onRightClick (Flagged x y), css style ]
 
-            else
-                []
+                Stopped -> 
+                    [onClick (RequestedNewList x y)]
+
+                _ -> 
+                    []
 
         attributes =
             css (cellStyle ++ [ backgroundColor bgColor, color textColor, fontWeight bold ]) :: actions
@@ -333,7 +326,7 @@ view model =
             , widthInput model
             , mineInput model
             ]
-        , button [ onClick RequestedNewList ] [ text "Restart" ]
+        , button [ onClick Restart ] [ text "Restart" ]
         , text (statusString model.status)
         , viewBoard model
         ]
@@ -359,24 +352,55 @@ arrayOfMinePositionsToBoard width height array =
     in
     W.wrap (go result (Array.toList array))
 
+getAdjacent : X -> Y -> BoardWidth -> BoardHeight -> List (X, Y, Int)
+getAdjacent x y w h =
+    let 
 
-generateNewList : BoardWidth -> BoardHeight -> MineCount -> Cmd Msg
-generateNewList width height mineCount =
+        xp1 =
+            W.succ x
+
+        xm1 =
+            W.pred x
+
+        yp1 =
+            W.succ y
+
+        ym1 =
+            W.pred y
+
+    in
+            [ ( xm1, ym1 ), ( xm1, y ), ( xm1, yp1 ), ( x, ym1 ), ( x, yp1 ), ( xp1, ym1 ), ( xp1, y ), ( xp1, yp1 ) ]
+            |> List.foldl (\(xa, ya) l -> case atCell xa ya w h of 
+                Just i -> (xa, ya, i) :: l
+                Nothing -> l) []
+    
+
+
+generateNewList : X -> Y -> BoardWidth -> BoardHeight -> MineCount -> Cmd Msg
+generateNewList x y width height mineCount =
     let
+        l = getAdjacent x y width height 
+                |> List.map (\(_, _, i) -> i) 
+
         length =
             extract height * extract width
 
+        p = extract x * extract width + extract y
+
+        values = Array.initialize length identity
+                 |> Array.filter (\e -> (List.find (\j -> j == e) l |> Maybe.isNothing) && e /= p)
+
         generator =
-            W.lift reservoirSample mineCount (Array.initialize length identity)
+            W.lift reservoirSample mineCount values
     in
-    Random.generate NewListGenerated generator
+    Random.generate (NewListGenerated x y) generator
 
 
 
 -- Its a hack!
 
 
-atCell : X -> Y -> BoardWidth -> BoardHeight -> Int
+atCell : X -> Y -> BoardWidth -> BoardHeight -> Maybe Int
 atCell x y w h =
     let
         xp =
@@ -392,10 +416,10 @@ atCell x y w h =
             extract h
     in
     if xp >= hp || xp < 0 || yp < 0 || yp >= wp then
-        -1
+       Nothing
 
     else
-        xp * wp + yp
+        Just (xp * wp + yp)
 
 
 
@@ -426,6 +450,7 @@ floodFill x y w h cells =
     let
         pos =
             atCell x y w h
+            |> Maybe.withDefault -1
 
         ( content, visibility ) =
             case W.lift (Array.get pos) cells of
@@ -478,6 +503,7 @@ playAt model x y =
     let
         pos =
             atCell x y model.boardWidth model.boardHeight
+            |> Maybe.withDefault -1
     in
     case Array.get pos (W.extract model.cells) of
         Nothing ->
@@ -517,6 +543,7 @@ toggleCell model x y =
     let
         pos =
             atCell x y model.boardWidth model.boardHeight
+            |> Maybe.withDefault -1
     in
     case Array.get pos (W.extract model.cells) of
         Nothing ->
@@ -529,11 +556,11 @@ toggleCell model x y =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
-        NewListGenerated array ->
-            ( { model | cells = F.lift2 arrayOfMinePositionsToBoard .boardWidth .boardHeight model array, status = Ongoing }, Cmd.none )
+        NewListGenerated x y array ->
+            ( playAt { model | cells = F.lift2 arrayOfMinePositionsToBoard .boardWidth .boardHeight model array, status = Ongoing } x y, Cmd.none )
 
-        RequestedNewList ->
-            ( model, F.lift3 generateNewList .boardWidth .boardHeight .mineCount model )
+        RequestedNewList x y ->
+            ( model, F.lift3 (generateNewList x y) .boardWidth .boardHeight .mineCount model )
 
         HeightChanged m ->
             ( { model | boardHeight = m }, Cmd.none )
@@ -551,7 +578,7 @@ update message model =
             ( playAt model x y, Cmd.none )
 
         Restart ->
-            ( model, F.lift3 generateNewList .boardWidth .boardHeight .mineCount model )
+            ( {model | cells = emptyBoard model.boardWidth model.boardHeight, status = Stopped }, Cmd.none )
 
 
 
@@ -560,19 +587,19 @@ update message model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { cells = emptyBoard
+    ( { cells = W.wrapLift2 emptyBoard 10 10
       , boardWidth = W.wrap 10
       , boardHeight = W.wrap 10
-      , status = Ongoing
+      , status = Stopped
       , mineCount = W.wrap 10
       }
-    , F.lift3 generateNewList W.wrap W.wrap W.wrap 10
+    , Cmd.none
     )
 
 
-emptyBoard : Board
-emptyBoard =
-    W.wrap Array.empty
+emptyBoard : BoardWidth -> BoardHeight -> Board
+emptyBoard w h =
+    W.wrap (Array.initialize (W.lift2 (*) w h) (always (Cell Empty Hidden)))
 
 
 
@@ -637,7 +664,7 @@ red : Color
 red = rgb 255 0 0
 
 green : Color
-green = rgb 0 0 255
+green = rgb 0 175 25
 
 yellow : Color
 yellow = rgb 255 255 0
