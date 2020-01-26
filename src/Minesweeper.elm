@@ -32,8 +32,12 @@ type CellVisibility
     | Revealed
 
 
-type Board
-    = Board (Array Cell)
+type BoardT
+    = BoardT
+
+
+type alias Board =
+    WrappedA Cell BoardT
 
 
 type GameStatus
@@ -61,65 +65,43 @@ type Msg
     | MineCountChanged MineCount
 
 
-type BoardWidthT = BoardWidthT
-type BoardHeightT = BoardHeightT
-type MineCountT = MineCountT
-type alias BoardWidth = WrappedI BoardWidthT
+type BoardWidthT
+    = BoardWidthT
 
 
-type alias BoardHeight = WrappedI BoardHeightT
+type BoardHeightT
+    = BoardHeightT
 
 
-type alias MineCount = WrappedI MineCountT
+type MineCountT
+    = MineCountT
+
+type XT = XT 
+type YT = YT
+type alias X = WrappedI XT
+type alias Y = WrappedI YT
+
+
+type alias BoardWidth =
+    WrappedI BoardWidthT
+
+
+type alias BoardHeight =
+    WrappedI BoardHeightT
+
+
+type alias MineCount =
+    WrappedI MineCountT
 
 
 
 -- VIEW
+-- Inputs
 
 
 number : Int -> List (Attribute msg) -> List (Html msg) -> Html msg
 number val attr content =
     input (type_ "number" :: (value <| String.fromInt val) :: attr) content
-
-
-viewCell : Cell -> Html Msg
-viewCell (Cell cont _) =
-    let
-        c =
-            case cont of
-                Empty ->
-                    rgb 230 230 240
-
-                Mine ->
-                    rgb 138 3 3
-    in
-    div [ css (cellStyle ++ [ backgroundColor c ]) ] []
-
-
-viewRow : List Cell -> Html Msg
-viewRow cells =
-    cells
-        |> List.map viewCell
-        |> div [ css [ displayFlex ] ]
-
-
-viewBoard : Board -> BoardWidth -> Html Msg
-viewBoard (Board array) width =
-    let
-        cellList =
-            Array.toList array
-
-        loop cells a =
-            case cells of
-                [] ->
-                    a
-
-                c ->
-                    loop (W.lift List.drop width c) (a ++ [W.lift List.take width c ])
-    in
-    loop cellList []
-        |> List.map viewRow
-        |> div [ css [ border2 (px 1) solid ] ]
 
 
 msgWithDefault : (WrappedI a -> Msg) -> WrappedI a -> String -> Msg
@@ -132,9 +114,22 @@ msgWithDefault toMsg default received =
             toMsg (W.wrap i)
 
 
+{-| Builds a Html input field of 'number' type, mapping to a wrapped integer.
+
+    type MyInt = WrappedI MyTag
+    type alias Model = { myInt : MyInt }
+    type Msg = IntChanged MyInt
+
+    inputForMyInt = customInput .myInt IntChanged
+
+-}
 customInput : (Model -> WrappedI a) -> (WrappedI a -> Msg) -> Model -> Html Msg
 customInput get toMsg model =
-    number (W.extract (get model)) [ onChange (msgWithDefault toMsg (get model)) ] []
+    let
+        v =
+            get model
+    in
+    number (W.extract v) [ onChange (msgWithDefault toMsg v) ] []
 
 
 heightInput : Model -> Html Msg
@@ -152,17 +147,98 @@ mineInput =
     customInput .mineCount MineCountChanged
 
 
+
+-- Board
+
+countAdj : Model -> X -> Y -> Int
+countAdj model x y = 
+    let
+        xp1 = W.succ x
+        xm1 = W.pred x
+
+        yp1 = W.succ y
+        ym1 = W.pred y
+
+        check = [(xm1, ym1), (xm1, y), (xm1, yp1), (x, ym1), (x, yp1), (xp1, ym1), (xp1, y), (xp1, yp1)]
+
+        atCell v w = W.extract model.boardHeight * W.extract v + W.extract w
+
+        cellValue (v, w) = case W.lift (Array.get (atCell v w)) model.cells of
+                                Nothing -> Empty
+                                Just (Cell content _) -> content
+    in
+        List.foldl (\v a -> if cellValue v == Mine then a + 1 else a) 0 check
+    
+
+viewCell : Model -> X -> Y -> Cell -> Html Msg
+viewCell model x y (Cell cont visi) =
+    let
+        c =
+            case cont of
+                Empty ->
+                    rgb 230 230 240
+
+                Mine ->
+                    rgb 138 3 3
+
+        content =
+            case cont of
+                Empty ->
+                    [text <| String.fromInt <| countAdj model x y]
+                
+                Mine ->
+                    []
+
+    in
+    div [ css (cellStyle ++ [ backgroundColor c ]) ] content
+
+
+viewRow : Model -> X -> List Cell -> Html Msg
+viewRow model x cells =
+    cells
+        |> List.indexedMap (W.wrapLift (viewCell model x))
+        |> div [ css [ displayFlex ] ]
+
+
+viewBoard : Model -> Html Msg
+viewBoard model =
+    let
+        cellList =
+            W.lift Array.toList model.cells
+
+        w = model.boardWidth
+
+        loop cells a =
+            case cells of
+                [] ->
+                    a
+
+                c ->
+                    loop (W.lift List.drop w c) (a ++ [ W.lift List.take w c ])
+    in
+    loop cellList []
+        |> List.indexedMap (W.wrapLift (viewRow model))
+        |> div
+            [ css [ border2 (px 1) solid ]
+            ]
+
+
 view : Model -> Html Msg
 view model =
     div []
-        [ fieldset [] [ heightInput model, widthInput model, mineInput model ]
+        [ fieldset []
+            [ heightInput model
+            , widthInput model
+            , mineInput model
+            ]
         , button [ onClick RequestedNewList ] [ text "Generate" ]
-        , F.lift2 viewBoard .cells .boardWidth model
+        , viewBoard model
         ]
 
 
 
 -- UTILITIES
+
 
 arrayOfMinePositionsToBoard : BoardWidth -> BoardHeight -> Array Int -> Board
 arrayOfMinePositionsToBoard width height array =
@@ -178,7 +254,7 @@ arrayOfMinePositionsToBoard width height array =
                 i :: is ->
                     go (Array.set i (Cell Mine Hidden) rs) is
     in
-    Board (go result (Array.toList array))
+    W.wrap (go result (Array.toList array))
 
 
 generateNewList : BoardWidth -> BoardHeight -> MineCount -> Cmd Msg
@@ -237,7 +313,7 @@ init =
 
 emptyBoard : Board
 emptyBoard =
-    Board Array.empty
+    W.wrap Array.empty
 
 
 
