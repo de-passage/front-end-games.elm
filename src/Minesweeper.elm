@@ -1,9 +1,11 @@
 module Minesweeper exposing (Model, Msg, init, update, view)
 
 import Array exposing (Array)
+import Css exposing (..)
 import Dict exposing (Dict)
+import Function as F
 import Html.Events.Extra
-import Html.Styled exposing (Attribute, Html, button, div, input, text)
+import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, text)
 import Html.Styled.Attributes exposing (css, type_, value)
 import Html.Styled.Events exposing (onClick)
 import Random
@@ -14,12 +16,23 @@ onChange =
 
 
 type Cell
-    = Mine
-    | Empty
+    = Cell CellContent CellVisibility
 
 
-type alias Board =
-    Dict ( Int, Int ) Cell
+type CellContent
+    = Empty
+    | Mine
+
+
+type CellVisibility
+    = Hidden
+    | Flagged
+    | Marked
+    | Revealed
+
+
+type Board
+    = Board (Array Cell)
 
 
 type GameStatus
@@ -30,13 +43,10 @@ type GameStatus
 
 type alias Model =
     { cells : Board
-    , boardWidth : Int
-    , boardHeight : Int
+    , boardWidth : BoardWidth
+    , boardHeight : BoardHeight
     , status : GameStatus
-    , list : Array Int
-    , min : Int
-    , max : Int
-    , count : Int
+    , mineCount : MineCount
     }
 
 
@@ -45,9 +55,25 @@ type Msg
     | Restart ( Int, Int, Int )
     | RequestedNewList
     | NewListGenerated (Array Int)
-    | MaxChanged Int
-    | MinChanged Int
-    | CountChanged Int
+    | HeightChanged BoardHeight
+    | WidthChanged BoardWidth
+    | MineCountChanged MineCount
+
+
+type BoardWidth
+    = BoardWidth Int
+
+
+type BoardHeight
+    = BoardHeight Int
+
+
+type MineCount
+    = MineCount Int
+
+
+
+-- VIEW
 
 
 number : Int -> List (Attribute msg) -> List (Html msg) -> Html msg
@@ -55,74 +81,231 @@ number val attr content =
     input (type_ "number" :: (value <| String.fromInt val) :: attr) content
 
 
-tryMsg : (Int -> Msg) -> Int -> String -> Msg
-tryMsg m i =
-    String.toInt
-        >> Maybe.withDefault i
-        >> m
+cellToString : Cell -> String
+cellToString (Cell content visibility) =
+    let
+        visiS =
+            case visibility of
+                Hidden ->
+                    "H"
+
+                Revealed ->
+                    "R"
+
+                Flagged ->
+                    "F"
+
+                Marked ->
+                    "M"
+
+        contS =
+            case content of
+                Mine ->
+                    "X"
+
+                Empty ->
+                    " "
+    in
+    visiS ++ ("(" ++ contS) ++ ")"
+
+
+viewCell : Cell -> Html Msg
+viewCell (Cell cont _) =
+    let
+        c =
+            case cont of
+                Empty ->
+                    rgb 230 230 240
+
+                Mine ->
+                    rgb 138 3 3
+    in
+    div [ css (cellStyle ++ [ backgroundColor c ]) ] []
+
+
+viewRow : List Cell -> Html Msg
+viewRow cells =
+    cells
+        |> List.map viewCell
+        |> div [ css [ displayFlex ] ]
+
+
+viewBoard : Board -> BoardWidth -> Html Msg
+viewBoard (Board array) (BoardWidth width) =
+    let
+        cellList =
+            Array.toList array
+
+        loop cells a =
+            case cells of
+                [] ->
+                    a
+
+                c ->
+                    loop (List.drop width c) (a ++ [ List.take width c ])
+    in
+    loop cellList []
+        |> List.map viewRow
+        |> div [ css [ border2 (px 1) solid ] ]
+
+
+widthToInt : BoardWidth -> Int
+widthToInt (BoardWidth i) =
+    i
+
+
+heightToInt : BoardHeight -> Int
+heightToInt (BoardHeight i) =
+    i
+
+
+mineCountToInt : MineCount -> Int
+mineCountToInt (MineCount i) =
+    i
+
+
+msgWithDefault : (Int -> a) -> (a -> Msg) -> a -> String -> Msg
+msgWithDefault fromInt toMsg default received =
+    case String.toInt received of
+        Nothing ->
+            toMsg default
+
+        Just i ->
+            toMsg (fromInt i)
+
+customInput : (Model -> a) -> (a -> Int) -> (Int -> a) -> (a -> Msg) -> Model -> Html Msg
+customInput get toInt fromInt toMsg model = 
+    number (toInt (get model)) [ onChange (msgWithDefault fromInt toMsg (get model)) ] []
+
+heightInput : Model -> Html Msg
+heightInput =
+    customInput .boardHeight heightToInt BoardHeight HeightChanged 
+
+widthInput : Model -> Html Msg
+widthInput =
+    customInput .boardWidth widthToInt BoardWidth WidthChanged 
+
+mineInput : Model -> Html Msg
+mineInput =
+    customInput .mineCount mineCountToInt MineCount MineCountChanged 
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ button [ onClick RequestedNewList ] [ text "Generate" ]
-        , text
-            ((\l -> "[" ++ l ++ "]") <|
-                String.concat <|
-                    List.intersperse ", " <|
-                        List.map String.fromInt <|
-                            Array.toList model.list
-            )
-        , number model.min [ onChange (tryMsg MinChanged model.min) ] []
-        , number model.max [ onChange (tryMsg MaxChanged model.max) ] []
-        , number model.count [ onChange (tryMsg CountChanged model.count) ] []
+        [ fieldset [] [ heightInput model, widthInput model, mineInput model ]
+        , button [ onClick RequestedNewList ] [ text "Generate" ]
+        , F.lift2 viewBoard .cells .boardWidth model
         ]
+
+
+
+-- UTILITIES
+
+
+arrayOfMinePositionsToBoard : BoardWidth -> BoardHeight -> Array Int -> Board
+arrayOfMinePositionsToBoard (BoardWidth width) (BoardHeight height) array =
+    let
+        result =
+            Array.initialize (width * height) (always (Cell Empty Hidden))
+
+        go rs list =
+            case list of
+                [] ->
+                    rs
+
+                i :: is ->
+                    go (Array.set i (Cell Mine Hidden) rs) is
+    in
+    Board (go result (Array.toList array))
+
+
+generateNewList : BoardWidth -> BoardHeight -> MineCount -> Cmd Msg
+generateNewList (BoardWidth width) (BoardHeight height) (MineCount mineCount) =
+    let
+        length =
+            height * width
+
+        generator =
+            reservoirSample mineCount (Array.initialize length identity)
+    in
+    Random.generate NewListGenerated generator
+
+
+
+-- UPDATE
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
         NewListGenerated array ->
-            ( { model | list = array }, Cmd.none )
+            ( { model | cells = F.lift2 arrayOfMinePositionsToBoard .boardWidth .boardHeight model array }, Cmd.none )
 
         RequestedNewList ->
-            ( model, Random.generate NewListGenerated (reservoirSample model.count (Array.initialize (model.max - model.min + 1) (\i -> i + model.min))) )
+            ( model, F.lift3 generateNewList .boardWidth .boardHeight .mineCount model )
 
-        MaxChanged m ->
-            ( { model | max = m }, Cmd.none )
+        HeightChanged m ->
+            ( { model | boardHeight = m }, Cmd.none )
 
-        MinChanged m ->
-            ( { model | min = m }, Cmd.none )
+        WidthChanged m ->
+            ( { model | boardWidth = m }, Cmd.none )
 
-        CountChanged c ->
-            ( { model | count = c }, Cmd.none )
+        MineCountChanged c ->
+            ( { model | mineCount = c }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
 
 
-init : (Model, Cmd Msg)
+
+-- INIT
+
+
+init : ( Model, Cmd Msg )
 init =
-    ({ cells =
-        Dict.fromList
-            [ ( ( 0, 0 ), Mine )
-            , ( ( 0, 1 ), Empty )
-            , ( ( 0, 2 ), Empty )
-            , ( ( 1, 0 ), Empty )
-            , ( ( 1, 1 ), Empty )
-            , ( ( 1, 2 ), Empty )
-            , ( ( 2, 0 ), Empty )
-            , ( ( 2, 1 ), Mine )
-            , ( ( 2, 2 ), Empty )
-            ]
-    , boardWidth = 3
-    , boardHeight = 3
-    , status = Ongoing
-    , list = Array.empty
-    , min = 0
-    , max = 100
-    , count = 10
-    }, Cmd.none)
+    ( { cells = emptyBoard
+      , boardWidth = BoardWidth 10
+      , boardHeight = BoardHeight 10
+      , status = Ongoing
+      , mineCount = MineCount 10
+      }
+    , F.lift3 generateNewList BoardWidth BoardHeight MineCount 10
+    )
+
+
+emptyBoard : Board
+emptyBoard =
+    Board Array.empty
+
+
+
+-- CSS STYLES
+
+
+black : Color
+black =
+    rgb 0 0 0
+
+
+cellSize : Em
+cellSize =
+    em 1
+
+
+cellStyle : List Style
+cellStyle =
+    [ border3 (px 1) solid black
+    , overflow hidden
+    , textOverflow ellipsis
+    , width cellSize
+    , height cellSize
+    , textAlign center
+    ]
+
+
+
+-- RANDOM GENERATOR
 
 
 {-| Adapted from wikipedia <https://en.wikipedia.org/wiki/Reservoir_sampling>
