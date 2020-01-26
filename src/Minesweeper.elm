@@ -7,7 +7,8 @@ import Function as F
 import Html.Events.Extra
 import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, text)
 import Html.Styled.Attributes exposing (css, type_, value)
-import Html.Styled.Events exposing (onClick)
+import Html.Styled.Events exposing (onClick, preventDefaultOn)
+import Json.Decode as Json
 import Random
 import Wrapped as W exposing (..)
 
@@ -27,7 +28,7 @@ type CellContent
 
 type CellVisibility
     = Hidden
-    | Flagged
+    | MineFlagged
     | Marked
     | Revealed
 
@@ -43,7 +44,8 @@ type alias Board =
 type GameStatus
     = Ongoing
     | Won
-    | Lost Int Int
+    | Lost
+    | Stopped
 
 
 type alias Model =
@@ -56,8 +58,9 @@ type alias Model =
 
 
 type Msg
-    = PlayedAt Int Int
-    | Restart Int Int Int
+    = PlayedAt X Y
+    | Flagged X Y
+    | Restart
     | RequestedNewList
     | NewListGenerated (Array Int)
     | HeightChanged BoardHeight
@@ -76,10 +79,21 @@ type BoardHeightT
 type MineCountT
     = MineCountT
 
-type XT = XT 
-type YT = YT
-type alias X = WrappedI XT
-type alias Y = WrappedI YT
+
+type XT
+    = XT
+
+
+type YT
+    = YT
+
+
+type alias X =
+    WrappedI XT
+
+
+type alias Y =
+    WrappedI YT
 
 
 type alias BoardWidth =
@@ -150,47 +164,116 @@ mineInput =
 
 -- Board
 
-countAdj : Model -> X -> Y -> Int
-countAdj model x y = 
+
+countAdj : X -> Y -> BoardWidth -> BoardHeight -> Board -> Int
+countAdj x y w h board =
     let
-        xp1 = W.succ x
-        xm1 = W.pred x
+        xp1 =
+            W.succ x
 
-        yp1 = W.succ y
-        ym1 = W.pred y
+        xm1 =
+            W.pred x
 
-        check = [(xm1, ym1), (xm1, y), (xm1, yp1), (x, ym1), (x, yp1), (xp1, ym1), (xp1, y), (xp1, yp1)]
+        yp1 =
+            W.succ y
 
-        atCell v w = W.extract model.boardHeight * W.extract v + W.extract w
+        ym1 =
+            W.pred y
 
-        cellValue (v, w) = case W.lift (Array.get (atCell v w)) model.cells of
-                                Nothing -> Empty
-                                Just (Cell content _) -> content
+        check =
+            [ ( xm1, ym1 ), ( xm1, y ), ( xm1, yp1 ), ( x, ym1 ), ( x, yp1 ), ( xp1, ym1 ), ( xp1, y ), ( xp1, yp1 ) ]
+
+        cellValue ( a, b ) =
+            case W.lift (Array.get (atCell a b w h)) board of
+                Nothing ->
+                    Empty
+
+                Just (Cell content _) ->
+                    content
     in
-        List.foldl (\v a -> if cellValue v == Mine then a + 1 else a) 0 check
-    
+    List.foldl
+        (\v a ->
+            if cellValue v == Mine then
+                a + 1
+
+            else
+                a
+        )
+        0
+        check
+
+
+onRightClick : msg -> Attribute msg
+onRightClick msg =
+    preventDefaultOn "contextmenu" (Json.map alwaysPreventDefault (Json.succeed msg))
+
+
+alwaysPreventDefault : msg -> ( msg, Bool )
+alwaysPreventDefault msg =
+    ( msg, True )
+
 
 viewCell : Model -> X -> Y -> Cell -> Html Msg
 viewCell model x y (Cell cont visi) =
     let
-        c =
-            case cont of
-                Empty ->
-                    rgb 230 230 240
+        mistake = visi == Marked && model.status == Lost && cont == Empty
 
-                Mine ->
-                    rgb 138 3 3
+        bgColor =
+            case visi of
+                Hidden ->
+                    if cont == Mine && model.status == Lost then 
+                        mineColor
+                    else
+                        hiddenCellColor
 
-        content =
-            case cont of
-                Empty ->
-                    [text <| String.fromInt <| countAdj model x y]
-                
-                Mine ->
-                    []
+                MineFlagged ->
+                    flaggedCellColor
 
+                Marked ->
+                    markedColor
+
+                Revealed ->
+                    if cont == Mine then
+                        mineExplodedColor
+
+                    else
+                        emptyCellColor
+
+        (content, textColor) =
+            if cont == Empty && visi == Revealed then
+                let
+                    adj = F.lift3 (countAdj x y) .boardWidth .boardHeight .cells model
+                in
+                if adj /= 0  then
+                    ([ text (String.fromInt adj) ], adjColor adj)
+                else 
+                    ([], white)
+
+            else if mistake then
+                ([ text "X" ], white)
+
+            else
+                ([], white)
+
+        actions =
+            if model.status == Ongoing then
+                let
+                    style =
+                        if visi == Revealed then
+                            [ cursor default ]
+
+                        else
+                            [ cursor pointer ]
+                in
+                [ onClick (PlayedAt x y), onRightClick (Flagged x y), css style ]
+
+            else
+                []
+
+        attributes =
+            css (cellStyle ++ [ backgroundColor bgColor, color textColor, fontWeight bold ]) :: actions
     in
-    div [ css (cellStyle ++ [ backgroundColor c ]) ] content
+    div attributes content
 
 
 viewRow : Model -> X -> List Cell -> Html Msg
@@ -206,7 +289,8 @@ viewBoard model =
         cellList =
             W.lift Array.toList model.cells
 
-        w = model.boardWidth
+        w =
+            model.boardWidth
 
         loop cells a =
             case cells of
@@ -219,19 +303,38 @@ viewBoard model =
     loop cellList []
         |> List.indexedMap (W.wrapLift (viewRow model))
         |> div
-            [ css [ border2 (px 1) solid ]
+            [ css [ border2 (px 1) solid, margin auto, maxWidth fitContent ]
             ]
+
+
+statusString : GameStatus -> String
+statusString s =
+    case s of
+        Won ->
+            "Victory!"
+
+        Lost ->
+            "Kaboom!"
+
+        _ ->
+            ""
 
 
 view : Model -> Html Msg
 view model =
-    div []
+    div
+        [ css
+            [ margin auto
+            , maxWidth fitContent
+            ]
+        ]
         [ fieldset []
             [ heightInput model
             , widthInput model
             , mineInput model
             ]
-        , button [ onClick RequestedNewList ] [ text "Generate" ]
+        , button [ onClick RequestedNewList ] [ text "Restart" ]
+        , text (statusString model.status)
         , viewBoard model
         ]
 
@@ -270,14 +373,164 @@ generateNewList width height mineCount =
 
 
 
+-- Its a hack!
+
+
+atCell : X -> Y -> BoardWidth -> BoardHeight -> Int
+atCell x y w h =
+    let
+        xp =
+            extract x
+
+        yp =
+            extract y
+
+        wp =
+            extract w
+
+        hp =
+            extract h
+    in
+    if xp >= hp || xp < 0 || yp < 0 || yp >= wp then
+        -1
+
+    else
+        xp * wp + yp
+
+
+
 -- UPDATE
+
+
+allRevealed : Board -> Bool
+allRevealed b =
+    b
+        |> W.lift Array.toList
+        |> List.all (\(Cell c v) -> c == Mine || v == Revealed)
+
+
+getStatus : CellContent -> Board -> GameStatus
+getStatus cell cells =
+    if cell == Mine then
+        Lost
+
+    else if allRevealed cells then
+        Won
+
+    else
+        Ongoing
+
+
+floodFill : X -> Y -> BoardWidth -> BoardHeight -> Board -> Board
+floodFill x y w h cells =
+    let
+        pos =
+            atCell x y w h
+
+        ( content, visibility ) =
+            case W.lift (Array.get pos) cells of
+                Nothing ->
+                    ( Empty, Revealed )
+
+                Just (Cell c v) ->
+                    ( c, v )
+
+        revealed =
+            visibility == Revealed
+
+        mine =
+            content == Mine
+
+        reveal =
+            W.liftW (Array.set pos (Cell content Revealed))
+
+        revealIfNoAdjacent xp yp wp hp b =
+            if countAdj xp yp wp hp b == 0 then
+                floodFill xp yp wp hp b
+
+            else
+                b
+    in
+    if revealed || mine then
+        cells
+
+    else if countAdj x y w h cells == 0 then
+        reveal cells
+            |> floodFill (W.succ x) y w h
+            |> floodFill (W.pred x) y w h
+            |> floodFill x (W.succ y) w h
+            |> floodFill x (W.pred y) w h
+            |> floodFill (W.pred x) (W.pred y) w h
+            |> floodFill (W.succ x) (W.pred y) w h
+            |> floodFill (W.pred x) (W.succ y) w h
+            |> floodFill (W.succ x) (W.succ y) w h
+
+    else
+        reveal cells
+            |> revealIfNoAdjacent (W.succ x) y w h
+            |> revealIfNoAdjacent (W.pred x) y w h
+            |> revealIfNoAdjacent x (W.succ y) w h
+            |> revealIfNoAdjacent x (W.pred y) w h
+
+
+playAt : Model -> X -> Y -> Model
+playAt model x y =
+    let
+        pos =
+            atCell x y model.boardWidth model.boardHeight
+    in
+    case Array.get pos (W.extract model.cells) of
+        Nothing ->
+            model
+
+        Just (Cell c _) ->
+            let
+                nCells =
+                    model.cells
+                        |> floodFill x y model.boardWidth model.boardHeight
+                        |> W.liftW (Array.set pos (Cell c Revealed))
+
+                status =
+                    getStatus c nCells
+            in
+            { model | cells = nCells, status = status }
+
+
+nextFlag : CellVisibility -> CellVisibility
+nextFlag f =
+    case f of
+        Hidden ->
+            Marked
+
+        Marked ->
+            MineFlagged
+
+        MineFlagged ->
+            Hidden
+
+        Revealed ->
+            Revealed
+
+
+toggleCell : Model -> X -> Y -> Model
+toggleCell model x y =
+    let
+        pos =
+            atCell x y model.boardWidth model.boardHeight
+    in
+    case Array.get pos (W.extract model.cells) of
+        Nothing ->
+            model
+
+        Just (Cell c v) ->
+            { model | cells = W.liftW (Array.set pos (Cell c (nextFlag v))) model.cells }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
         NewListGenerated array ->
-            ( { model | cells = F.lift2 arrayOfMinePositionsToBoard .boardWidth .boardHeight model array }, Cmd.none )
+            ( { model | cells = F.lift2 arrayOfMinePositionsToBoard .boardWidth .boardHeight model array, status = Ongoing }, Cmd.none )
 
         RequestedNewList ->
             ( model, F.lift3 generateNewList .boardWidth .boardHeight .mineCount model )
@@ -291,8 +544,14 @@ update message model =
         MineCountChanged c ->
             ( { model | mineCount = c }, Cmd.none )
 
-        _ ->
-            ( model, Cmd.none )
+        Flagged x y ->
+            ( toggleCell model x y, Cmd.none )
+
+        PlayedAt x y ->
+            ( playAt model x y, Cmd.none )
+
+        Restart ->
+            ( model, F.lift3 generateNewList .boardWidth .boardHeight .mineCount model )
 
 
 
@@ -320,10 +579,80 @@ emptyBoard =
 -- CSS STYLES
 
 
+mineColor : Color
+mineColor =
+    rgb 200 0 0
+
+
+emptyCellColor : Color
+emptyCellColor =
+    rgb 230 230 240
+
+
+hiddenCellColor : Color
+hiddenCellColor =
+    rgb 110 110 110
+
+
+markedColor : Color
+markedColor =
+    rgb 75 0 0
+
+
+flaggedCellColor : Color
+flaggedCellColor =
+    rgb 204 102 255
+
+
+mineExplodedColor : Color
+mineExplodedColor =
+    rgb 255 160 0
+
+
 black : Color
 black =
     rgb 0 0 0
 
+white : Color
+white =
+    rgb 255 255 255
+
+
+adjColor : Int -> Color
+adjColor i = case i of 
+    1 -> blue
+    2 -> red
+    3 -> green
+    4 -> purple
+    5 -> orange
+    6 -> cyan
+    7 -> magenta
+    8 -> yellow
+    _ -> white
+
+blue : Color
+blue = rgb 0 0 255
+
+red : Color
+red = rgb 255 0 0
+
+green : Color
+green = rgb 0 0 255
+
+yellow : Color
+yellow = rgb 255 255 0
+
+magenta : Color
+magenta = rgb 255 0 255
+
+cyan : Color 
+cyan = rgb 0 255 255
+
+orange : Color
+orange = rgb 255 165 0
+
+purple : Color
+purple = rgb 128 0 128
 
 cellSize : Em
 cellSize =
