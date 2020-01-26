@@ -81,34 +81,6 @@ number val attr content =
     input (type_ "number" :: (value <| String.fromInt val) :: attr) content
 
 
-cellToString : Cell -> String
-cellToString (Cell content visibility) =
-    let
-        visiS =
-            case visibility of
-                Hidden ->
-                    "H"
-
-                Revealed ->
-                    "R"
-
-                Flagged ->
-                    "F"
-
-                Marked ->
-                    "M"
-
-        contS =
-            case content of
-                Mine ->
-                    "X"
-
-                Empty ->
-                    " "
-    in
-    visiS ++ ("(" ++ contS) ++ ")"
-
-
 viewCell : Cell -> Html Msg
 viewCell (Cell cont _) =
     let
@@ -149,6 +121,48 @@ viewBoard (Board array) (BoardWidth width) =
         |> div [ css [ border2 (px 1) solid ] ]
 
 
+msgWithDefault : (Int -> a) -> (a -> Msg) -> a -> String -> Msg
+msgWithDefault fromInt toMsg default received =
+    case String.toInt received of
+        Nothing ->
+            toMsg default
+
+        Just i ->
+            toMsg (fromInt i)
+
+
+customInput : (Model -> a) -> (a -> Int) -> (Int -> a) -> (a -> Msg) -> Model -> Html Msg
+customInput get toInt fromInt toMsg model =
+    number (toInt (get model)) [ onChange (msgWithDefault fromInt toMsg (get model)) ] []
+
+
+heightInput : Model -> Html Msg
+heightInput =
+    customInput .boardHeight heightToInt BoardHeight HeightChanged
+
+
+widthInput : Model -> Html Msg
+widthInput =
+    customInput .boardWidth widthToInt BoardWidth WidthChanged
+
+
+mineInput : Model -> Html Msg
+mineInput =
+    customInput .mineCount mineCountToInt MineCount MineCountChanged
+
+
+view : Model -> Html Msg
+view model =
+    div []
+        [ fieldset [] [ heightInput model, widthInput model, mineInput model ]
+        , button [ onClick RequestedNewList ] [ text "Generate" ]
+        , F.lift2 viewBoard .cells .boardWidth model
+        ]
+
+
+
+-- UTILITIES
+
 widthToInt : BoardWidth -> Int
 widthToInt (BoardWidth i) =
     i
@@ -163,44 +177,6 @@ mineCountToInt : MineCount -> Int
 mineCountToInt (MineCount i) =
     i
 
-
-msgWithDefault : (Int -> a) -> (a -> Msg) -> a -> String -> Msg
-msgWithDefault fromInt toMsg default received =
-    case String.toInt received of
-        Nothing ->
-            toMsg default
-
-        Just i ->
-            toMsg (fromInt i)
-
-customInput : (Model -> a) -> (a -> Int) -> (Int -> a) -> (a -> Msg) -> Model -> Html Msg
-customInput get toInt fromInt toMsg model = 
-    number (toInt (get model)) [ onChange (msgWithDefault fromInt toMsg (get model)) ] []
-
-heightInput : Model -> Html Msg
-heightInput =
-    customInput .boardHeight heightToInt BoardHeight HeightChanged 
-
-widthInput : Model -> Html Msg
-widthInput =
-    customInput .boardWidth widthToInt BoardWidth WidthChanged 
-
-mineInput : Model -> Html Msg
-mineInput =
-    customInput .mineCount mineCountToInt MineCount MineCountChanged 
-
-
-view : Model -> Html Msg
-view model =
-    div []
-        [ fieldset [] [ heightInput model, widthInput model, mineInput model ]
-        , button [ onClick RequestedNewList ] [ text "Generate" ]
-        , F.lift2 viewBoard .cells .boardWidth model
-        ]
-
-
-
--- UTILITIES
 
 
 arrayOfMinePositionsToBoard : BoardWidth -> BoardHeight -> Array Int -> Board
@@ -321,7 +297,7 @@ reservoirSample n source =
             Random.float 0 1
 
         result =
-            Array.fromList (List.take n <| Array.toList source)
+            Array.slice 0 n source
 
         w : Random.Generator Float
         w =
@@ -330,12 +306,16 @@ reservoirSample n source =
 
         next : Int -> Float -> Random.Generator Int
         next i x =
-            randomF |> Random.map (\r -> 1 + i + floor (logBase e r / logBase e (1 - x)))
+            randomF
+                |> Random.map (\r -> 1 + i + floor (logBase e r / logBase e (1 - x)))
 
         repl i list k =
-            Array.get i source
-                |> Maybe.map (\e -> Array.set k e list)
-                |> Maybe.withDefault list
+            case Array.get i source of
+                Nothing ->
+                    list
+
+                Just x ->
+                    Array.set k x list
 
         loop : Int -> Array a -> Float -> Random.Generator (Array a)
         loop i list x =
@@ -361,9 +341,12 @@ reservoirSample n source =
         Random.int 0 (max - 1)
             |> Random.map
                 (\i ->
-                    Array.get i source
-                        |> Maybe.map (\x -> Array.fromList [ x ])
-                        |> Maybe.withDefault Array.empty
+                    case Array.get i source of
+                        Just x ->
+                            Array.fromList [ x ]
+
+                        Nothing ->
+                            Array.empty
                 )
 
     else

@@ -39,28 +39,40 @@ init : flags -> ( Model, Cmd Msg )
 init _ =
     let
         ( model, command ) =
-            TTT.init
+            MS.init
     in
-    ( { gameModel = TicTacToe model
+    ( { gameModel = Minesweeper model
       }
-    , toTTTCmd command
+    , fromMSCmd command
     )
 
 
 adaptCmd : (msg -> ExtMsg) -> Cmd msg -> Cmd Msg
-adaptCmd f =
-    Cmd.map (f >> ExternalMessage)
+adaptCmd = adaptFunc Cmd.map
+
+adaptHtml : (msg -> ExtMsg) -> Html msg -> Html Msg
+adaptHtml = adaptFunc Html.map
+
+adaptFunc : ((b -> Msg) -> a -> c) -> (b -> ExtMsg) -> a -> c
+adaptFunc m f a = m (f >> ExternalMessage) a
 
 
-toTTTCmd : Cmd TTT.Msg -> Cmd Msg
-toTTTCmd =
+fromTTTCmd : Cmd TTT.Msg -> Cmd Msg
+fromTTTCmd =
     adaptCmd TicTacToeMsg
 
 
-toMSCmd : Cmd MS.Msg -> Cmd Msg
-toMSCmd =
+fromMSCmd : Cmd MS.Msg -> Cmd Msg
+fromMSCmd =
     adaptCmd MinesweeperMsg
 
+fromTTTHtml : Html TTT.Msg -> Html Msg
+fromTTTHtml = 
+    adaptHtml TicTacToeMsg
+
+fromMSHtml : Html MS.Msg -> Html Msg
+fromMSHtml = 
+    adaptHtml MinesweeperMsg
 
 type ExtMsg
     = TicTacToeMsg TTT.Msg
@@ -76,10 +88,10 @@ initialGame : GameTag -> ( GameModel, Cmd Msg )
 initialGame tag =
     case tag of
         MinesweeperT ->
-            MS.init |> Tuple.mapBoth Minesweeper toMSCmd
+            MS.init |> Tuple.mapBoth Minesweeper fromMSCmd
 
         TicTacToeT ->
-            TTT.init |> Tuple.mapBoth TicTacToe toTTTCmd
+            TTT.init |> Tuple.mapBoth TicTacToe fromTTTCmd
 
 
 dispatchUpdate :
@@ -151,7 +163,7 @@ mapUpdate upd toMsg toModel model1 msg model =
         ( m, c ) =
             upd msg model
     in
-    ( { model1 | gameModel = toModel m }, Cmd.map (toMsg >> ExternalMessage) c )
+    ( { model1 | gameModel = toModel m }, adaptCmd toMsg c )
 
 
 updateTTT :
@@ -259,11 +271,11 @@ gameView m =
     case m of
         TicTacToe model ->
             div []
-                [ text "TicTacToe", Html.map (TicTacToeMsg >> ExternalMessage) (TTT.view model) ]
+                [ text "TicTacToe", fromTTTHtml (TTT.view model) ]
 
         Minesweeper model ->
             div []
-                [ text "Minesweeper", Html.map (MinesweeperMsg >> ExternalMessage) (MS.view model) ]
+                [ text "Minesweeper", fromMSHtml (MS.view model) ]
 
 
 

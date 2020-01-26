@@ -378,15 +378,16 @@ aggregate board player depth position ( currentMax, currentDepth, currentPositio
 -- VIEW
 
 
-boardAsTable : Board -> List (List IndexedCell)
+boardAsTable : Board -> List (Array IndexedCell)
 boardAsTable (Board cells) =
     let
         c =
-            Array.toIndexedList cells |> List.map (\( i, cell ) -> ( Position i, cell ))
+            cells 
+            |> Array.indexedMap (\i cell -> ( Position i, cell ))
     in
-    [ List.take 3 c
-    , List.take 3 <| List.drop 3 c
-    , List.drop 6 c
+    [ Array.slice 0 3 c
+    , Array.slice 3 6 c
+    , Array.slice 6 9 c
     ]
 
 
@@ -419,12 +420,12 @@ viewCell model cell =
                     styledTd [] []
 
 
-viewRow : Model -> List IndexedCell -> Html Msg
+viewRow : Model -> Array IndexedCell -> Html Msg
 viewRow m cells =
-    tr [] <| List.map (viewCell m) cells
+    tr [] <| Array.toList <| Array.map (viewCell m) cells
 
 
-viewBoard : Model -> List (List IndexedCell) -> Html Msg
+viewBoard : Model -> List (Array IndexedCell) -> Html Msg
 viewBoard m b =
     table [ tableStyle ] [ tbody [] (List.map (viewRow m) b) ]
 
