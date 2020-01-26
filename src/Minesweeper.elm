@@ -5,14 +5,14 @@ import Css exposing (..)
 import Dict exposing (Dict)
 import Function as F
 import Html.Events.Extra
-import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, text)
-import Html.Styled.Attributes exposing (css, type_, value)
+import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, legend, text)
+import Html.Styled.Attributes exposing (css, for, name, type_, value)
 import Html.Styled.Events exposing (onClick, preventDefaultOn)
 import Json.Decode as Json
-import Random
-import Wrapped as W exposing (..)
 import List.Extra as List
 import Maybe.Extra as Maybe
+import Random
+import Wrapped as W exposing (..)
 
 
 onChange =
@@ -139,26 +139,26 @@ msgWithDefault toMsg default received =
     inputForMyInt = customInput .myInt IntChanged
 
 -}
-customInput : (Model -> WrappedI a) -> (WrappedI a -> Msg) -> Model -> Html Msg
-customInput get toMsg model =
+customInput : (Model -> WrappedI a) -> (WrappedI a -> Msg) -> Model -> List (Attribute Msg) -> Html Msg
+customInput get toMsg model attributes =
     let
         v =
             get model
     in
-    number (W.extract v) [ onChange (msgWithDefault toMsg v) ] []
+    number (W.extract v) (onChange (msgWithDefault toMsg v) :: attributes) []
 
 
-heightInput : Model -> Html Msg
+heightInput : Model -> List (Attribute Msg) -> Html Msg
 heightInput =
     customInput .boardHeight HeightChanged
 
 
-widthInput : Model -> Html Msg
+widthInput : Model -> List (Attribute Msg) -> Html Msg
 widthInput =
     customInput .boardWidth WidthChanged
 
 
-mineInput : Model -> Html Msg
+mineInput : Model -> List (Attribute Msg) -> Html Msg
 mineInput =
     customInput .mineCount MineCountChanged
 
@@ -170,7 +170,8 @@ mineInput =
 countAdj : X -> Y -> BoardWidth -> BoardHeight -> Board -> Int
 countAdj x y w h board =
     let
-        check = getAdjacent x y w h
+        check =
+            getAdjacent x y w h
 
         cellValue ( _, _, i ) =
             case W.lift (Array.get i) board of
@@ -205,13 +206,15 @@ alwaysPreventDefault msg =
 viewCell : Model -> X -> Y -> Cell -> Html Msg
 viewCell model x y (Cell cont visi) =
     let
-        mistake = visi == Marked && model.status == Lost && cont == Empty
+        mistake =
+            visi == Marked && model.status == Lost && cont == Empty
 
         bgColor =
             case visi of
                 Hidden ->
-                    if cont == Mine && model.status == Lost then 
+                    if cont == Mine && model.status == Lost then
                         mineColor
+
                     else
                         hiddenCellColor
 
@@ -228,21 +231,23 @@ viewCell model x y (Cell cont visi) =
                     else
                         emptyCellColor
 
-        (content, textColor) =
+        ( content, textColor ) =
             if cont == Empty && visi == Revealed then
                 let
-                    adj = F.lift3 (countAdj x y) .boardWidth .boardHeight .cells model
+                    adj =
+                        F.lift3 (countAdj x y) .boardWidth .boardHeight .cells model
                 in
-                if adj /= 0  then
-                    ([ text (String.fromInt adj) ], adjColor adj)
-                else 
-                    ([], white)
+                if adj /= 0 then
+                    ( [ text (String.fromInt adj) ], adjColor adj )
+
+                else
+                    ( [], white )
 
             else if mistake then
-                ([ text "X" ], white)
+                ( [ text "X" ], white )
 
             else
-                ([], white)
+                ( [], white )
 
         actions =
             case model.status of
@@ -257,10 +262,10 @@ viewCell model x y (Cell cont visi) =
                     in
                     [ onClick (PlayedAt x y), onRightClick (Flagged x y), css style ]
 
-                Stopped -> 
-                    [onClick (RequestedNewList x y)]
+                Stopped ->
+                    [ onClick (RequestedNewList x y) ]
 
-                _ -> 
+                _ ->
                     []
 
         attributes =
@@ -315,21 +320,47 @@ statusString s =
 
 view : Model -> Html Msg
 view model =
+    let
+        visi =
+            if model.status == Ongoing then
+                visibility hidden
+
+            else
+                visibility visible
+
+        optionStyle =
+            [ margin (px 5), displayFlex, justifyContent spaceBetween ]
+
+        optionField =
+            [ fieldset [ css [ marginBottom (em 1), visi ] ]
+                [ legend [] [ text "Options" ]
+                , div [ css optionStyle ]
+                    [ label [ for "height", css [ marginRight (em 1) ] ] [ text "Rows" ]
+                    , heightInput model [ name "height" ]
+                    ]
+                , div [ css optionStyle ]
+                    [ label [ for "width", css [ marginRight (em 1) ] ] [ text "Columns" ]
+                    , widthInput model [ name "width" ]
+                    ]
+                , div [ css optionStyle ]
+                    [ label [ for "mines", css [ marginRight (em 1) ] ] [ text "Number of mines" ]
+                    , mineInput model [ name "mines" ]
+                    ]
+                ]
+            ]
+    in
     div
         [ css
             [ margin auto
             , maxWidth fitContent
             ]
         ]
-        [ fieldset []
-            [ heightInput model
-            , widthInput model
-            , mineInput model
-            ]
-        , button [ onClick Restart ] [ text "Restart" ]
-        , text (statusString model.status)
-        , viewBoard model
-        ]
+        (optionField
+            ++ [ button [ onClick Restart ] [ text "Restart" ]
+               , text (statusString model.status)
+               , viewBoard model
+               ]
+        )
 
 
 
@@ -352,10 +383,10 @@ arrayOfMinePositionsToBoard width height array =
     in
     W.wrap (go result (Array.toList array))
 
-getAdjacent : X -> Y -> BoardWidth -> BoardHeight -> List (X, Y, Int)
-getAdjacent x y w h =
-    let 
 
+getAdjacent : X -> Y -> BoardWidth -> BoardHeight -> List ( X, Y, Int )
+getAdjacent x y w h =
+    let
         xp1 =
             W.succ x
 
@@ -367,37 +398,41 @@ getAdjacent x y w h =
 
         ym1 =
             W.pred y
-
     in
-            [ ( xm1, ym1 ), ( xm1, y ), ( xm1, yp1 ), ( x, ym1 ), ( x, yp1 ), ( xp1, ym1 ), ( xp1, y ), ( xp1, yp1 ) ]
-            |> List.foldl (\(xa, ya) l -> case atCell xa ya w h of 
-                Just i -> (xa, ya, i) :: l
-                Nothing -> l) []
-    
+    [ ( xm1, ym1 ), ( xm1, y ), ( xm1, yp1 ), ( x, ym1 ), ( x, yp1 ), ( xp1, ym1 ), ( xp1, y ), ( xp1, yp1 ) ]
+        |> List.foldl
+            (\( xa, ya ) l ->
+                case atCell xa ya w h of
+                    Just i ->
+                        ( xa, ya, i ) :: l
+
+                    Nothing ->
+                        l
+            )
+            []
 
 
 generateNewList : X -> Y -> BoardWidth -> BoardHeight -> MineCount -> Cmd Msg
 generateNewList x y width height mineCount =
     let
-        l = getAdjacent x y width height 
-                |> List.map (\(_, _, i) -> i) 
+        l =
+            getAdjacent x y width height
+                |> List.map (\( _, _, i ) -> i)
 
         length =
             extract height * extract width
 
-        p = extract x * extract width + extract y
+        p =
+            extract x * extract width + extract y
 
-        values = Array.initialize length identity
-                 |> Array.filter (\e -> (List.find (\j -> j == e) l |> Maybe.isNothing) && e /= p)
+        values =
+            Array.initialize length identity
+                |> Array.filter (\e -> (List.find (\j -> j == e) l |> Maybe.isNothing) && e /= p)
 
         generator =
             W.lift reservoirSample mineCount values
     in
     Random.generate (NewListGenerated x y) generator
-
-
-
--- Its a hack!
 
 
 atCell : X -> Y -> BoardWidth -> BoardHeight -> Maybe Int
@@ -416,7 +451,7 @@ atCell x y w h =
             extract h
     in
     if xp >= hp || xp < 0 || yp < 0 || yp >= wp then
-       Nothing
+        Nothing
 
     else
         Just (xp * wp + yp)
@@ -450,7 +485,7 @@ floodFill x y w h cells =
     let
         pos =
             atCell x y w h
-            |> Maybe.withDefault -1
+                |> Maybe.withDefault -1
 
         ( content, visibility ) =
             case W.lift (Array.get pos) cells of
@@ -503,7 +538,7 @@ playAt model x y =
     let
         pos =
             atCell x y model.boardWidth model.boardHeight
-            |> Maybe.withDefault -1
+                |> Maybe.withDefault -1
     in
     case Array.get pos (W.extract model.cells) of
         Nothing ->
@@ -543,7 +578,7 @@ toggleCell model x y =
     let
         pos =
             atCell x y model.boardWidth model.boardHeight
-            |> Maybe.withDefault -1
+                |> Maybe.withDefault -1
     in
     case Array.get pos (W.extract model.cells) of
         Nothing ->
@@ -578,7 +613,7 @@ update message model =
             ( playAt model x y, Cmd.none )
 
         Restart ->
-            ( {model | cells = emptyBoard model.boardWidth model.boardHeight, status = Stopped }, Cmd.none )
+            ( { model | cells = emptyBoard model.boardWidth model.boardHeight, status = Stopped }, Cmd.none )
 
 
 
@@ -640,46 +675,82 @@ black : Color
 black =
     rgb 0 0 0
 
+
 white : Color
 white =
     rgb 255 255 255
 
 
 adjColor : Int -> Color
-adjColor i = case i of 
-    1 -> blue
-    2 -> red
-    3 -> green
-    4 -> purple
-    5 -> orange
-    6 -> cyan
-    7 -> magenta
-    8 -> yellow
-    _ -> white
+adjColor i =
+    case i of
+        1 ->
+            blue
+
+        2 ->
+            red
+
+        3 ->
+            green
+
+        4 ->
+            purple
+
+        5 ->
+            orange
+
+        6 ->
+            cyan
+
+        7 ->
+            magenta
+
+        8 ->
+            yellow
+
+        _ ->
+            white
+
 
 blue : Color
-blue = rgb 0 0 255
+blue =
+    rgb 0 0 255
+
 
 red : Color
-red = rgb 255 0 0
+red =
+    rgb 255 0 0
+
 
 green : Color
-green = rgb 0 175 25
+green =
+    rgb 0 175 25
+
 
 yellow : Color
-yellow = rgb 255 255 0
+yellow =
+    rgb 255 255 0
+
 
 magenta : Color
-magenta = rgb 255 0 255
+magenta =
+    rgb 255 0 255
 
-cyan : Color 
-cyan = rgb 0 255 255
+
+cyan : Color
+cyan =
+    rgb 0 255 255
+
 
 orange : Color
-orange = rgb 255 165 0
+orange =
+    rgb 255 165 0
+
 
 purple : Color
-purple = rgb 128 0 128
+purple =
+    rgb 128 0 128
+
 
 cellSize : Em
 cellSize =
