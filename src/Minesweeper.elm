@@ -9,6 +9,7 @@ import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, text
 import Html.Styled.Attributes exposing (css, type_, value)
 import Html.Styled.Events exposing (onClick)
 import Random
+import Wrapped as W exposing (..)
 
 
 onChange =
@@ -38,7 +39,7 @@ type Board
 type GameStatus
     = Ongoing
     | Won
-    | Lost ( Int, Int )
+    | Lost Int Int
 
 
 type alias Model =
@@ -51,8 +52,8 @@ type alias Model =
 
 
 type Msg
-    = PlayedAt ( Int, Int )
-    | Restart ( Int, Int, Int )
+    = PlayedAt Int Int
+    | Restart Int Int Int
     | RequestedNewList
     | NewListGenerated (Array Int)
     | HeightChanged BoardHeight
@@ -60,16 +61,16 @@ type Msg
     | MineCountChanged MineCount
 
 
-type BoardWidth
-    = BoardWidth Int
+type BoardWidthT = BoardWidthT
+type BoardHeightT = BoardHeightT
+type MineCountT = MineCountT
+type alias BoardWidth = WrappedI BoardWidthT
 
 
-type BoardHeight
-    = BoardHeight Int
+type alias BoardHeight = WrappedI BoardHeightT
 
 
-type MineCount
-    = MineCount Int
+type alias MineCount = WrappedI MineCountT
 
 
 
@@ -103,7 +104,7 @@ viewRow cells =
 
 
 viewBoard : Board -> BoardWidth -> Html Msg
-viewBoard (Board array) (BoardWidth width) =
+viewBoard (Board array) width =
     let
         cellList =
             Array.toList array
@@ -114,41 +115,41 @@ viewBoard (Board array) (BoardWidth width) =
                     a
 
                 c ->
-                    loop (List.drop width c) (a ++ [ List.take width c ])
+                    loop (W.lift List.drop width c) (a ++ [W.lift List.take width c ])
     in
     loop cellList []
         |> List.map viewRow
         |> div [ css [ border2 (px 1) solid ] ]
 
 
-msgWithDefault : (Int -> a) -> (a -> Msg) -> a -> String -> Msg
-msgWithDefault fromInt toMsg default received =
+msgWithDefault : (WrappedI a -> Msg) -> WrappedI a -> String -> Msg
+msgWithDefault toMsg default received =
     case String.toInt received of
         Nothing ->
             toMsg default
 
         Just i ->
-            toMsg (fromInt i)
+            toMsg (W.wrap i)
 
 
-customInput : (Model -> a) -> (a -> Int) -> (Int -> a) -> (a -> Msg) -> Model -> Html Msg
-customInput get toInt fromInt toMsg model =
-    number (toInt (get model)) [ onChange (msgWithDefault fromInt toMsg (get model)) ] []
+customInput : (Model -> WrappedI a) -> (WrappedI a -> Msg) -> Model -> Html Msg
+customInput get toMsg model =
+    number (W.extract (get model)) [ onChange (msgWithDefault toMsg (get model)) ] []
 
 
 heightInput : Model -> Html Msg
 heightInput =
-    customInput .boardHeight heightToInt BoardHeight HeightChanged
+    customInput .boardHeight HeightChanged
 
 
 widthInput : Model -> Html Msg
 widthInput =
-    customInput .boardWidth widthToInt BoardWidth WidthChanged
+    customInput .boardWidth WidthChanged
 
 
 mineInput : Model -> Html Msg
 mineInput =
-    customInput .mineCount mineCountToInt MineCount MineCountChanged
+    customInput .mineCount MineCountChanged
 
 
 view : Model -> Html Msg
@@ -163,27 +164,11 @@ view model =
 
 -- UTILITIES
 
-widthToInt : BoardWidth -> Int
-widthToInt (BoardWidth i) =
-    i
-
-
-heightToInt : BoardHeight -> Int
-heightToInt (BoardHeight i) =
-    i
-
-
-mineCountToInt : MineCount -> Int
-mineCountToInt (MineCount i) =
-    i
-
-
-
 arrayOfMinePositionsToBoard : BoardWidth -> BoardHeight -> Array Int -> Board
-arrayOfMinePositionsToBoard (BoardWidth width) (BoardHeight height) array =
+arrayOfMinePositionsToBoard width height array =
     let
         result =
-            Array.initialize (width * height) (always (Cell Empty Hidden))
+            Array.initialize (W.lift2 (*) width height) (always (Cell Empty Hidden))
 
         go rs list =
             case list of
@@ -197,13 +182,13 @@ arrayOfMinePositionsToBoard (BoardWidth width) (BoardHeight height) array =
 
 
 generateNewList : BoardWidth -> BoardHeight -> MineCount -> Cmd Msg
-generateNewList (BoardWidth width) (BoardHeight height) (MineCount mineCount) =
+generateNewList width height mineCount =
     let
         length =
-            height * width
+            extract height * extract width
 
         generator =
-            reservoirSample mineCount (Array.initialize length identity)
+            W.lift reservoirSample mineCount (Array.initialize length identity)
     in
     Random.generate NewListGenerated generator
 
@@ -241,12 +226,12 @@ update message model =
 init : ( Model, Cmd Msg )
 init =
     ( { cells = emptyBoard
-      , boardWidth = BoardWidth 10
-      , boardHeight = BoardHeight 10
+      , boardWidth = W.wrap 10
+      , boardHeight = W.wrap 10
       , status = Ongoing
-      , mineCount = MineCount 10
+      , mineCount = W.wrap 10
       }
-    , F.lift3 generateNewList BoardWidth BoardHeight MineCount 10
+    , F.lift3 generateNewList W.wrap W.wrap W.wrap 10
     )
 
 
