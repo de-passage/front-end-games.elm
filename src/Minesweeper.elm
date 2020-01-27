@@ -15,6 +15,7 @@ import Random
 import Wrapped as W exposing (..)
 
 
+onChange : (String -> msg) -> Attribute msg
 onChange =
     Html.Styled.Attributes.fromUnstyled << Html.Events.Extra.onChange
 
@@ -56,6 +57,9 @@ type alias Model =
     , boardHeight : BoardHeight
     , status : GameStatus
     , mineCount : MineCount
+    , optionWidth : BoardWidth
+    , optionHeight : BoardHeight
+    , optionMineCount : MineCount
     }
 
 
@@ -150,12 +154,12 @@ customInput get toMsg model attributes =
 
 heightInput : Model -> List (Attribute Msg) -> Html Msg
 heightInput =
-    customInput .boardHeight HeightChanged
+    customInput .optionHeight HeightChanged
 
 
 widthInput : Model -> List (Attribute Msg) -> Html Msg
 widthInput =
-    customInput .boardWidth WidthChanged
+    customInput .optionWidth WidthChanged
 
 
 mineInput : Model -> List (Attribute Msg) -> Html Msg
@@ -246,8 +250,11 @@ viewCell model x y (Cell cont visi) =
             else if mistake then
                 ( [ text "X" ], white )
 
+            else if visi == MineFlagged then
+                ([text "?"], white)
             else
                 ( [], white )
+            
 
         actions =
             case model.status of
@@ -259,8 +266,19 @@ viewCell model x y (Cell cont visi) =
 
                             else
                                 [ cursor pointer ]
+
+                        clickEvent = 
+                            case visi of 
+                                Hidden -> 
+                                    [ onClick (PlayedAt x y), onRightClick (Flagged x y) ]
+                                MineFlagged -> 
+                                    [ onClick (PlayedAt x y), onRightClick (Flagged x y) ]
+                                Marked -> 
+                                    [ onRightClick (Flagged x y) ]
+                                Revealed -> 
+                                    []
                     in
-                    [ onClick (PlayedAt x y), onRightClick (Flagged x y), css style ]
+                    css style :: clickEvent
 
                 Stopped ->
                     [ onClick (RequestedNewList x y) ]
@@ -598,10 +616,10 @@ update message model =
             ( model, F.lift3 (generateNewList x y) .boardWidth .boardHeight .mineCount model )
 
         HeightChanged m ->
-            ( { model | boardHeight = m }, Cmd.none )
+            ( { model | optionHeight = m }, Cmd.none )
 
         WidthChanged m ->
-            ( { model | boardWidth = m }, Cmd.none )
+            ( { model | optionWidth = m }, Cmd.none )
 
         MineCountChanged c ->
             ( { model | mineCount = c }, Cmd.none )
@@ -613,7 +631,7 @@ update message model =
             ( playAt model x y, Cmd.none )
 
         Restart ->
-            ( { model | cells = emptyBoard model.boardWidth model.boardHeight, status = Stopped }, Cmd.none )
+            ( { model | cells = emptyBoard model.optionWidth model.optionHeight, status = Stopped, boardWidth = model.optionWidth, boardHeight = model.optionHeight }, Cmd.none )
 
 
 
@@ -625,8 +643,11 @@ init =
     ( { cells = W.wrapLift2 emptyBoard 10 10
       , boardWidth = W.wrap 10
       , boardHeight = W.wrap 10
-      , status = Stopped
       , mineCount = W.wrap 10
+      , optionWidth = W.wrap 10
+      , optionHeight = W.wrap 10
+      , optionMineCount = W.wrap 10
+      , status = Stopped
       }
     , Cmd.none
     )
