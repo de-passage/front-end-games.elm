@@ -6,8 +6,8 @@ import Dict exposing (Dict)
 import Function as F
 import Html.Events.Extra
 import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, legend, text)
-import Html.Styled.Attributes exposing (css, for, name, type_, value)
-import Html.Styled.Events exposing (onClick, onDoubleClick, preventDefaultOn)
+import Html.Styled.Attributes exposing (css, for, max, min, name, type_, value)
+import Html.Styled.Events exposing (onClick, onDoubleClick, preventDefaultOn, onInput)
 import Json.Decode as Json
 import List.Extra as List
 import Maybe.Extra as Maybe
@@ -73,6 +73,7 @@ type Msg
     | WidthChanged BoardWidth
     | MineCountChanged MineCount
     | RevealAdjacent X Y
+    | RightClicked
 
 
 type BoardWidthT
@@ -150,7 +151,7 @@ customInput get toMsg model attributes =
         v =
             get model
     in
-    number (W.extract v) (onChange (msgWithDefault toMsg v) :: attributes) []
+    number (W.extract v) (onChange (msgWithDefault toMsg v) :: onInput (msgWithDefault toMsg v) :: attributes) []
 
 
 heightInput : Model -> List (Attribute Msg) -> Html Msg
@@ -340,6 +341,16 @@ statusString s =
             ""
 
 
+sizeMin : Int
+sizeMin =
+    10
+
+
+sizeMax : Int
+sizeMax =
+    30
+
+
 view : Model -> Html Msg
 view model =
     let
@@ -358,11 +369,11 @@ view model =
                 [ legend [] [ text "Options" ]
                 , div [ css optionStyle ]
                     [ label [ for "height", css [ marginRight (em 1) ] ] [ text "Rows" ]
-                    , heightInput model [ name "height" ]
+                    , heightInput model [ name "height", min <| String.fromInt sizeMin, max <| String.fromInt sizeMax ]
                     ]
                 , div [ css optionStyle ]
                     [ label [ for "width", css [ marginRight (em 1) ] ] [ text "Columns" ]
-                    , widthInput model [ name "width" ]
+                    , widthInput model [ name "width", min <| String.fromInt sizeMin, max <| String.fromInt sizeMax ]
                     ]
                 , div [ css optionStyle ]
                     [ label [ for "mines", css [ marginRight (em 1) ] ] [ text "Number of mines" ]
@@ -684,6 +695,20 @@ revealAdjacent x y model =
                     model
 
 
+clampW : WrappedI a -> WrappedI a
+clampW =
+    W.liftW (clamp sizeMin sizeMax)
+
+
+clampM : BoardHeight -> BoardWidth -> MineCount -> MineCount
+clampM h w m =
+    let
+        ma =
+            W.lift2 (*) h w * 9 // 10
+    in
+    W.liftW (clamp 1 ma) m
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
@@ -704,13 +729,23 @@ update message model =
             )
 
         HeightChanged m ->
-            ( { model | optionHeight = m }, Cmd.none )
+            ( { model
+                | optionHeight = clampW m
+                , mineCount = F.lift3 clampM .optionHeight .optionWidth .mineCount model
+              }
+            , Cmd.none
+            )
 
         WidthChanged m ->
-            ( { model | optionWidth = m }, Cmd.none )
+            ( { model
+                | optionWidth = clampW m
+                , mineCount = F.lift3 clampM .optionHeight .optionWidth .mineCount model
+              }
+            , Cmd.none
+            )
 
         MineCountChanged c ->
-            ( { model | mineCount = c }, Cmd.none )
+            ( { model | mineCount = clampM model.optionHeight model.optionWidth c }, Cmd.none )
 
         Flagged x y ->
             ( toggleCell model x y, Cmd.none )
@@ -730,6 +765,9 @@ update message model =
 
         RevealAdjacent x y ->
             ( revealAdjacent x y model, Cmd.none )
+
+        RightClicked ->
+            ( model, Cmd.none )
 
 
 
@@ -964,14 +1002,15 @@ reservoirSample n source =
                         |> Random.andThen (\j -> loop j result x)
                 )
 
+
 noTextSelectionStyle : Style
 noTextSelectionStyle =
-  [ ("-webkit-touch-callout", "none")
-  , ("-webkit-user-select",   "none")
-  , ("-khtml-user-select",    "none")
-  , ("-moz-user-select",      "none")
-  , ("-ms-user-select",       "none")
-  , ("-user-select",          "none")
-  ]
-  |> List.map (F.uncurry property)
-  |> Css.batch
+    [ ( "-webkit-touch-callout", "none" )
+    , ( "-webkit-user-select", "none" )
+    , ( "-khtml-user-select", "none" )
+    , ( "-moz-user-select", "none" )
+    , ( "-ms-user-select", "none" )
+    , ( "-user-select", "none" )
+    ]
+        |> List.map (F.uncurry property)
+        |> Css.batch
