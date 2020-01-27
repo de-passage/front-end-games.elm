@@ -7,7 +7,7 @@ import Function as F
 import Html.Events.Extra
 import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, legend, text)
 import Html.Styled.Attributes exposing (css, for, name, type_, value)
-import Html.Styled.Events exposing (onClick, preventDefaultOn)
+import Html.Styled.Events exposing (onClick, onDoubleClick, preventDefaultOn)
 import Json.Decode as Json
 import List.Extra as List
 import Maybe.Extra as Maybe
@@ -72,6 +72,7 @@ type Msg
     | HeightChanged BoardHeight
     | WidthChanged BoardWidth
     | MineCountChanged MineCount
+    | RevealAdjacent X Y
 
 
 type BoardWidthT
@@ -251,10 +252,10 @@ viewCell model x y (Cell cont visi) =
                 ( [ text "X" ], white )
 
             else if visi == MineFlagged then
-                ([text "?"], white)
+                ( [ text "?" ], white )
+
             else
                 ( [], white )
-            
 
         actions =
             case model.status of
@@ -267,16 +268,19 @@ viewCell model x y (Cell cont visi) =
                             else
                                 [ cursor pointer ]
 
-                        clickEvent = 
-                            case visi of 
-                                Hidden -> 
+                        clickEvent =
+                            case visi of
+                                Hidden ->
                                     [ onClick (PlayedAt x y), onRightClick (Flagged x y) ]
-                                MineFlagged -> 
+
+                                MineFlagged ->
                                     [ onClick (PlayedAt x y), onRightClick (Flagged x y) ]
-                                Marked -> 
+
+                                Marked ->
                                     [ onRightClick (Flagged x y) ]
-                                Revealed -> 
-                                    []
+
+                                Revealed ->
+                                    [ onDoubleClick (RevealAdjacent x y) ]
                     in
                     css style :: clickEvent
 
@@ -319,7 +323,7 @@ viewBoard model =
     loop cellList []
         |> List.indexedMap (W.wrapLift (viewRow model))
         |> div
-            [ css [ border2 (px 1) solid, margin auto, maxWidth fitContent ]
+            [ css [ border2 (px 1) solid, margin auto, maxWidth fitContent, noTextSelectionStyle ]
             ]
 
 
@@ -606,14 +610,98 @@ toggleCell model x y =
             { model | cells = W.liftW (Array.set pos (Cell c (nextFlag v))) model.cells }
 
 
+adjacentSafe : Model -> X -> Y -> Maybe (List ( X, Y, Int ))
+adjacentSafe model x y =
+    let
+        adj =
+            getAdjacent x y model.boardWidth model.boardHeight
+
+        ( mineNumber, markNumber, revealable ) =
+            adj |> List.foldl aggr ( 0, 0, [] )
+
+        aggr ( x1, y1, i ) ( mine, mark, l ) =
+            case W.lift (Array.get i) model.cells of
+                Nothing ->
+                    ( mine, mark, l )
+
+                Just (Cell c v) ->
+                    let
+                        mi =
+                            if c == Mine then
+                                mine + 1
+
+                            else
+                                mine
+
+                        ma =
+                            if v == Marked then
+                                mark + 1
+
+                            else
+                                mark
+
+                        li =
+                            if v == Hidden || v == MineFlagged then
+                                ( x1, y1, i ) :: l
+
+                            else
+                                l
+                    in
+                    ( mi, ma, li )
+    in
+    if mineNumber == markNumber then
+        Just revealable
+
+    else
+        Nothing
+
+
+revealAdjacent : X -> Y -> Model -> Model
+revealAdjacent x y model =
+    case W.lift (Array.get (atCell x y model.boardWidth model.boardHeight |> Maybe.withDefault -1)) model.cells of
+        Nothing ->
+            model
+
+        Just (Cell _ _) ->
+            let
+                adj =
+                    adjacentSafe model x y
+            in
+            case adj of
+                Just l ->
+                    l
+                        |> List.foldl
+                            (\( x1, y1, _ ) acc ->
+                                if acc.status == Ongoing then
+                                    playAt acc x1 y1
+
+                                else
+                                    acc
+                            )
+                            model
+
+                Nothing ->
+                    model
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
         NewListGenerated x y array ->
-            ( playAt { model | cells = F.lift2 arrayOfMinePositionsToBoard .boardWidth .boardHeight model array, status = Ongoing } x y, Cmd.none )
+            ( playAt
+                { model
+                    | cells = F.lift2 arrayOfMinePositionsToBoard .boardWidth .boardHeight model array
+                    , status = Ongoing
+                }
+                x
+                y
+            , Cmd.none
+            )
 
         RequestedNewList x y ->
-            ( model, F.lift3 (generateNewList x y) .boardWidth .boardHeight .mineCount model )
+            ( model
+            , F.lift3 (generateNewList x y) .boardWidth .boardHeight .mineCount model
+            )
 
         HeightChanged m ->
             ( { model | optionHeight = m }, Cmd.none )
@@ -631,7 +719,17 @@ update message model =
             ( playAt model x y, Cmd.none )
 
         Restart ->
-            ( { model | cells = emptyBoard model.optionWidth model.optionHeight, status = Stopped, boardWidth = model.optionWidth, boardHeight = model.optionHeight }, Cmd.none )
+            ( { model
+                | cells = emptyBoard model.optionWidth model.optionHeight
+                , status = Stopped
+                , boardWidth = model.optionWidth
+                , boardHeight = model.optionHeight
+              }
+            , Cmd.none
+            )
+
+        RevealAdjacent x y ->
+            ( revealAdjacent x y model, Cmd.none )
 
 
 
@@ -865,3 +963,15 @@ reservoirSample n source =
                     next (n - 1) x
                         |> Random.andThen (\j -> loop j result x)
                 )
+
+noTextSelectionStyle : Style
+noTextSelectionStyle =
+  [ ("-webkit-touch-callout", "none")
+  , ("-webkit-user-select",   "none")
+  , ("-khtml-user-select",    "none")
+  , ("-moz-user-select",      "none")
+  , ("-ms-user-select",       "none")
+  , ("-user-select",          "none")
+  ]
+  |> List.map (F.uncurry property)
+  |> Css.batch
