@@ -7,6 +7,7 @@ import Html.Styled as Html exposing (..)
 import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
 import Minesweeper as MS
+import Snake as SK
 import TicTacToe as TTT
 
 
@@ -23,16 +24,33 @@ main =
 type GameModel
     = TicTacToe TTT.Model
     | Minesweeper MS.Model
+    | Snake SK.Model
 
 
 type GameTag
     = TicTacToeT
     | MinesweeperT
+    | SnakeT
 
 
 type alias Model =
     { gameModel : GameModel
     }
+
+
+type ExtMsg
+    = TicTacToeMsg TTT.Msg
+    | MinesweeperMsg MS.Msg
+    | SnakeMsg SK.Msg
+
+
+type Msg
+    = ExternalMessage ExtMsg
+    | GameChanged GameTag
+
+
+
+-- INIT
 
 
 init : flags -> ( Model, Cmd Msg )
@@ -47,14 +65,36 @@ init _ =
     )
 
 
+initialGame : GameTag -> ( GameModel, Cmd Msg )
+initialGame tag =
+    case tag of
+        MinesweeperT ->
+            MS.init |> Tuple.mapBoth Minesweeper fromMSCmd
+
+        TicTacToeT ->
+            TTT.init |> Tuple.mapBoth TicTacToe fromTTTCmd
+
+        SnakeT ->
+            SK.init |> Tuple.mapBoth Snake fromSKCmd
+
+
+
+-- ADAPTERS
+
+
 adaptCmd : (msg -> ExtMsg) -> Cmd msg -> Cmd Msg
-adaptCmd = adaptFunc Cmd.map
+adaptCmd =
+    adaptFunc Cmd.map
+
 
 adaptHtml : (msg -> ExtMsg) -> Html msg -> Html Msg
-adaptHtml = adaptFunc Html.map
+adaptHtml =
+    adaptFunc Html.map
+
 
 adaptFunc : ((b -> Msg) -> a -> c) -> (b -> ExtMsg) -> a -> c
-adaptFunc m f a = m (f >> ExternalMessage) a
+adaptFunc m f a =
+    m (f >> ExternalMessage) a
 
 
 fromTTTCmd : Cmd TTT.Msg -> Cmd Msg
@@ -66,32 +106,25 @@ fromMSCmd : Cmd MS.Msg -> Cmd Msg
 fromMSCmd =
     adaptCmd MinesweeperMsg
 
+
+fromSKCmd : Cmd SK.Msg -> Cmd Msg
+fromSKCmd =
+    adaptCmd SnakeMsg
+
+
 fromTTTHtml : Html TTT.Msg -> Html Msg
-fromTTTHtml = 
+fromTTTHtml =
     adaptHtml TicTacToeMsg
 
+
 fromMSHtml : Html MS.Msg -> Html Msg
-fromMSHtml = 
+fromMSHtml =
     adaptHtml MinesweeperMsg
 
-type ExtMsg
-    = TicTacToeMsg TTT.Msg
-    | MinesweeperMsg MS.Msg
 
-
-type Msg
-    = ExternalMessage ExtMsg
-    | GameChanged GameTag
-
-
-initialGame : GameTag -> ( GameModel, Cmd Msg )
-initialGame tag =
-    case tag of
-        MinesweeperT ->
-            MS.init |> Tuple.mapBoth Minesweeper fromMSCmd
-
-        TicTacToeT ->
-            TTT.init |> Tuple.mapBoth TicTacToe fromTTTCmd
+fromSKHtml : Html SK.Msg -> Html Msg
+fromSKHtml =
+    adaptHtml SnakeMsg
 
 
 dispatchUpdate :
@@ -99,50 +132,47 @@ dispatchUpdate :
     -> a
     -> (TTT.Msg -> TTT.Model -> a)
     -> (MS.Msg -> MS.Model -> a)
+    -> (SK.Msg -> SK.Model -> a)
     -> GameModel
     -> a
-dispatchUpdate msg default ttt ms =
+dispatchUpdate msg default ttt ms sk model =
     case msg of
         TicTacToeMsg msg1 ->
-            tictactoe default (ttt msg1)
+            case model of
+                TicTacToe m ->
+                    ttt msg1 m
+
+                _ ->
+                    default
 
         MinesweeperMsg msg1 ->
-            minesweeper default (ms msg1)
+            case model of
+                Minesweeper m ->
+                    ms msg1 m
 
+                _ ->
+                    default
 
-dispatchGame : (TTT.Model -> a) -> (MS.Model -> a) -> GameModel -> a
-dispatchGame ttt ms game =
-    case game of
-        TicTacToe m ->
-            ttt m
+        SnakeMsg msg1 ->
+            case model of
+                Snake m ->
+                    sk msg1 m
 
-        Minesweeper m ->
-            ms m
-
-
-minesweeper : a -> (MS.Model -> a) -> GameModel -> a
-minesweeper default =
-    dispatchGame (always default)
-
-
-tictactoe : a -> (TTT.Model -> a) -> GameModel -> a
-tictactoe default f =
-    dispatchGame f (always default)
-
-
-tictacttoeTag : TTT.Model -> GameTag
-tictacttoeTag =
-    always TicTacToeT
-
-
-minesweeperTag : MS.Model -> GameTag
-minesweeperTag =
-    always MinesweeperT
+                _ ->
+                    default
 
 
 gameType : GameModel -> GameTag
-gameType =
-    dispatchGame tictacttoeTag minesweeperTag
+gameType model =
+    case model of
+        TicTacToe _ ->
+            TicTacToeT
+
+        Minesweeper _ ->
+            MinesweeperT
+
+        Snake _ ->
+            SnakeT
 
 
 isGame : GameTag -> GameModel -> Bool
@@ -184,6 +214,15 @@ updateMS =
     mapUpdate MS.update MinesweeperMsg Minesweeper
 
 
+updateSK :
+    Model
+    -> SK.Msg
+    -> SK.Model
+    -> ( Model, Cmd Msg )
+updateSK =
+    mapUpdate SK.update SnakeMsg Snake
+
+
 noCmd : a -> ( a, Cmd msg )
 noCmd a =
     ( a, Cmd.none )
@@ -203,7 +242,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ExternalMessage msg1 ->
-            Function.lift4 (dispatchUpdate msg1) noCmd updateTTT updateMS getGame <| model
+            Function.lift5 (dispatchUpdate msg1) noCmd updateTTT updateMS updateSK getGame <| model
 
         GameChanged newGame ->
             initialGame newGame
@@ -230,6 +269,7 @@ tabsFor model =
         games =
             [ ( "Minesweeper", MinesweeperT )
             , ( "TicTacToe", TicTacToeT )
+            , ( "Snake", SnakeT )
             ]
 
         tabStyle tag =
@@ -271,11 +311,14 @@ gameView m =
     case m of
         TicTacToe model ->
             div []
-                [ text "TicTacToe", fromTTTHtml (TTT.view model) ]
+                [ fromTTTHtml (TTT.view model) ]
 
         Minesweeper model ->
             div []
-                [ text "Minesweeper", fromMSHtml (MS.view model) ]
+                [ fromMSHtml (MS.view model) ]
+
+        Snake model ->
+            div [] [ fromSKHtml (SK.view model) ]
 
 
 
