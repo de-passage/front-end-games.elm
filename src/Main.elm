@@ -347,7 +347,7 @@ selectedTextColor =
 
 tabBorderColor : Color
 tabBorderColor =
-    rgb 10 15 148
+    selectedBgColor
 
 
 tabBorder : Color -> Style
