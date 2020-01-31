@@ -1,14 +1,17 @@
 module Plane exposing
-    ( Height(..)
+    ( Coordinates
+    , Height(..)
     , Plane
     , Width(..)
     , X(..)
     , Y(..)
+    , Row
     , Point
     , at
     , clampAt
     , clampSetAt
     , clampToCoordinates
+    , clampToPoint
     , clampUpdateAt
     , defaultInitialize
     , down
@@ -19,6 +22,10 @@ module Plane exposing
     , height
     , initialize
     , left
+    , map
+    , mapIndexed
+    , mapIndexedRow
+    , mapRows
     , pointToPlane
     , right
     , set
@@ -36,6 +43,7 @@ module Plane exposing
     , wrapRight
     , wrapSetAt
     , wrapToCoordinates
+    , wrapToPoint
     , wrapUp
     , wrapUpdateAt
     )
@@ -70,6 +78,9 @@ type Plane a
 type Point a
     = Point Coordinates (Plane a)
 
+
+type Row a 
+    = Row (Array a) X Width
 
 initialize : Height -> Width -> (Coordinates -> a) -> Plane a
 initialize (Height h) (Width w) f =
@@ -314,3 +325,31 @@ toArray (Plane b h w d) =
 
 toList : Plane a -> List (Point a)
 toList = toArray >> Array.toList
+
+mapRows : (Row a -> b) -> Plane a -> List b
+mapRows f (Plane b _ (Width w) _) = 
+    let
+        loop curr arr acc = 
+            if Array.length arr <= curr then
+                List.reverse acc
+            
+            else
+                loop (curr + w + 1) arr (f (Row (Array.slice curr (curr + w) arr) (X (curr // w)) (Width w)) :: acc)
+    in 
+        loop 0 b []
+
+mapIndexedRow : (Coordinates -> a -> b) -> Row a -> Array b
+mapIndexedRow f (Row arr (X x) (Width w)) =
+    Array.indexedMap (\y v -> f (C (x * w + y)) v) arr
+
+    
+
+map : (a -> b) -> Plane a -> Plane b
+map f (Plane b h w d) = 
+    Array.map f b 
+    |> \b1 -> Plane b1 h w (f d)
+
+mapIndexed : (Coordinates -> a -> b) -> Plane a -> Plane b
+mapIndexed f (Plane b h w d) = 
+    Array.indexedMap (\c v-> f (C c) v) b 
+    |> \b1 -> Plane b1 h w (f (C -1) d)

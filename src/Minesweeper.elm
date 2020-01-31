@@ -377,7 +377,7 @@ view model =
                     ]
                 , div [ css optionStyle ]
                     [ label [ for "mines", css [ marginRight (em 1) ] ] [ text "Number of mines" ]
-                    , mineInput model [ name "mines" ]
+                    , mineInput model [ name "mines", min <| String.fromInt sizeMin, max <| String.fromInt sizeMax ]
                     ]
                 ]
             ]
@@ -699,12 +699,14 @@ clampW : WrappedI a -> WrappedI a
 clampW =
     W.liftW (clamp sizeMin sizeMax)
 
+maxMineCount : BoardHeight -> BoardWidth -> Int
+maxMineCount h w = W.lift2 (*) h w * 9 // 10
 
 clampM : BoardHeight -> BoardWidth -> MineCount -> MineCount
 clampM h w m =
     let
-        ma =
-            W.lift2 (*) h w * 9 // 10
+        ma = maxMineCount h w
+            
     in
     W.liftW (clamp 1 ma) m
 
