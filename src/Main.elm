@@ -242,7 +242,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ExternalMessage msg1 ->
-            Function.lift5 (dispatchUpdate msg1) noCmd updateTTT updateMS updateSK getGame <| model
+            Function.lift5 (dispatchUpdate msg1) noCmd updateTTT updateMS updateSK getGame model
 
         GameChanged newGame ->
             initialGame newGame
@@ -250,8 +250,10 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model.gameModel of 
+        Snake m -> Sub.map (SnakeMsg >> ExternalMessage) (SK.subscriptions m)
+        _ -> Sub.none
 
 
 view : Model -> Browser.Document Msg

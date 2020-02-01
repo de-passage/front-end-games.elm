@@ -40,12 +40,16 @@ module Plane exposing
     , width
     , wrapAt
     , wrapDown
+    , wrapPointDown
     , wrapLeft
+    , wrapPointLeft
     , wrapRight
+    , wrapPointRight
     , wrapSetAt
     , wrapToCoordinates
     , wrapToPoint
     , wrapUp
+    , wrapPointUp
     , wrapUpdateAt
     )
 
@@ -319,6 +323,30 @@ wrapUp (X x) y =
 wrapDown : X -> Y -> Plane a -> Point a
 wrapDown (X x) y =
     wrapToPoint (X (x + 1)) y
+
+wrapPointUp : Point a -> Point a
+wrapPointUp (Point c plane) =
+    let (x, y) = fromCoordinates c plane
+    in 
+        wrapUp x y plane
+
+wrapPointDown : Point a -> Point a
+wrapPointDown (Point c plane) =
+    let (x, y) = fromCoordinates c plane
+    in 
+        wrapDown x y plane
+
+wrapPointLeft : Point a -> Point a
+wrapPointLeft (Point c plane) =
+    let (x, y) = fromCoordinates c plane
+    in 
+        wrapLeft x y plane
+
+wrapPointRight : Point a -> Point a
+wrapPointRight (Point c plane) =
+    let (x, y) = fromCoordinates c plane
+    in 
+        wrapRight x y plane
 
 toArray : Plane a -> Array (Point a)
 toArray (Plane b h w d) = 
