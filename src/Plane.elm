@@ -114,7 +114,7 @@ defaultInitialize h w a =
 
 toCoordinates : X -> Y -> Plane a -> Maybe Coordinates
 toCoordinates (X x) (Y y) (Plane _ (Height h) (Width w) _) =
-    if x < 0 || y < 0 || x >= h || y >= h then
+    if x < 0 || y < 0 || x >= h || y >= w then
         Nothing
 
     else
@@ -128,7 +128,7 @@ fromCoordinates (C i) (Plane _ _ (Width w) _) =
 
 toPoint : X -> Y -> Plane a -> Maybe (Point a)
 toPoint (X x) (Y y) (Plane p (Height h) (Width w) d) =
-    if x < 0 || y < 0 || x >= h || y >= h then
+    if x < 0 || y < 0 || x >= h || y >= w then
         Nothing
 
     else
@@ -176,20 +176,14 @@ wrapToPoint : X -> Y -> Plane a -> Point a
 wrapToPoint (X x) (Y y) (Plane p (Height h) (Width w) d) =
     let
         x1 =
-            if x < 0 then
-                h - modBy h x - 1
-
-            else if x >= h then
+            if x < 0 || x >= h then
                 modBy h x
 
             else
                 x
 
         y1 =
-            if y < 0 then
-                h - modBy w y - 1
-
-            else if y >= w then
+            if y < 0 || y >= w then
                 modBy w y
 
             else
@@ -363,7 +357,7 @@ mapRows f (Plane b _ (Width w) _) =
                 List.reverse acc
             
             else
-                loop (curr + w + 1) arr (f (Row (Array.slice curr (curr + w) arr) (X (curr // w)) (Width w)) :: acc)
+                loop (curr + w) arr (f (Row (Array.slice curr (curr + w) arr) (X (curr // w)) (Width w)) :: acc)
     in 
         loop 0 b []
 

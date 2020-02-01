@@ -10,6 +10,7 @@ import Html.Styled.Events exposing (..)
 import Json.Decode as Decode
 import List.Extra as List
 import Plane exposing (Coordinates, Height(..), Plane, Point, Row, Width(..), X(..), Y(..))
+import Random
 import Time
 
 
@@ -18,11 +19,13 @@ type Msg
     | None
     | DirectionChanged Direction
     | SpeedChanged Speed
+    | NewTargetTick
+    | TargetPositionGenerated ( X, Y )
+    | Restart
 
 
 type Cell
-    = Target
-    | Wall
+    = Wall
     | Empty
 
 
@@ -51,6 +54,7 @@ type alias Model =
     , score : Score
     , direction : Direction
     , speed : Speed
+    , targets : List (Point Cell)
     }
 
 
@@ -91,6 +95,7 @@ initialGame =
     , score = zero
     , direction = Right
     , speed = Speed 500
+    , targets = []
     }
 
 
@@ -105,7 +110,11 @@ init =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch [ Time.every (toFloat <| fromSpeed model.speed) (always Tick), Browser.Events.onKeyDown (decodeDirection model) ]
+    Sub.batch
+        [ Time.every (toFloat <| fromSpeed model.speed) (always Tick)
+        , Browser.Events.onKeyDown (decodeDirection model)
+        , Time.every 1800 (always NewTargetTick)
+        ]
 
 
 decodeDirection : Model -> Decode.Decoder Msg
@@ -114,16 +123,32 @@ decodeDirection model =
         toDirection string =
             case string of
                 "ArrowLeft" ->
-                    DirectionChanged Left
+                    if model.direction == Up || model.direction == Down then
+                        DirectionChanged Left
+
+                    else
+                        None
 
                 "ArrowRight" ->
-                    DirectionChanged Right
+                    if model.direction == Up || model.direction == Down then
+                        DirectionChanged Right
+
+                    else
+                        None
 
                 "ArrowUp" ->
-                    DirectionChanged Up
+                    if model.direction == Left || model.direction == Right then
+                        DirectionChanged Up
+
+                    else
+                        None
 
                 "ArrowDown" ->
-                    DirectionChanged Down
+                    if model.direction == Left || model.direction == Right then
+                        DirectionChanged Down
+
+                    else
+                        None
 
                 _ ->
                     None
@@ -206,13 +231,13 @@ cellType model coord cell =
     if liftNE2 List.any (sameCoordinates coord) model.snake then
         SnakeCell
 
+    else if List.any (sameCoordinates coord) model.targets then
+        TargetCell
+
     else
         case cell of
             Empty ->
                 EmptyCell
-
-            Target ->
-                TargetCell
 
             Wall ->
                 WallCell
@@ -256,8 +281,9 @@ view model =
             , backgroundColor grey
             ]
         ]
-        (speedInput model ::
-        (Plane.mapRows (viewRow model) model.board) )
+        (speedInput model
+            :: Plane.mapRows (viewRow model) model.board
+        )
 
 
 
@@ -301,8 +327,49 @@ update msg model =
         SpeedChanged s ->
             ( { model | speed = s }, Cmd.none )
 
+        NewTargetTick ->
+            ( model, generateNewTarget model )
+
+        TargetPositionGenerated ( x, y ) ->
+            ( { model | targets = addTarget x y model }, Cmd.none )
+
+        Restart -> 
+            init
+
         None ->
             ( model, Cmd.none )
+
+
+addTarget : X -> Y -> Model -> List (Point Cell)
+addTarget x y model =
+    let
+        pos =
+            Plane.wrapToPoint x y model.board
+
+        coord =
+            Tuple.first (Plane.fromPoint pos)
+    in
+    if Plane.at pos == Wall || liftNE2 List.any (sameCoordinates coord) model.snake || List.any (sameCoordinates coord) model.targets then
+        model.targets
+
+    else
+        pos :: model.targets
+
+
+generateNewTarget : Model -> Cmd Msg
+generateNewTarget model =
+    if List.length model.targets > 2 then
+        Cmd.none
+
+    else
+        generateXY (Plane.width model.board) (Plane.height model.board)
+
+
+generateXY : Width -> Height -> Cmd Msg
+generateXY (Width w) (Height h) =
+    Random.int 0 w
+        |> Random.andThen (\y -> Random.int 0 h |> Random.map (\x -> ( X x, Y y )))
+        |> Random.generate TargetPositionGenerated
 
 
 
