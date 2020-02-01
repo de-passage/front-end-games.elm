@@ -15,6 +15,7 @@ module Plane exposing
     , clampUpdateAt
     , defaultInitialize
     , down
+    , coordinatesEqual
     , fromCoordinates
     , fromPoint
     , get
@@ -353,3 +354,6 @@ mapIndexed : (Coordinates -> a -> b) -> Plane a -> Plane b
 mapIndexed f (Plane b h w d) = 
     Array.indexedMap (\c v-> f (C c) v) b 
     |> \b1 -> Plane b1 h w (f (C -1) d)
+
+coordinatesEqual : Coordinates -> Coordinates -> Bool
+coordinatesEqual (C a) (C b) = a == b

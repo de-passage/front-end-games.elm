@@ -3,10 +3,11 @@ module Snake exposing (Cell(..), Model, Msg, init, update, view)
 import Array exposing (Array)
 import Css exposing (..)
 import Function exposing (..)
-import Html.Styled exposing (Attribute, Html, text, div)
-import Html.Styled.Events exposing (..)
+import Html.Styled exposing (Attribute, Html, div, text)
 import Html.Styled.Attributes exposing (css)
-import Plane exposing (Height(..), Plane, Point, Width(..), X(..), Y(..), Row, Coordinates)
+import Html.Styled.Events exposing (..)
+import List.Extra as List
+import Plane exposing (Coordinates, Height(..), Plane, Point, Row, Width(..), X(..), Y(..))
 
 
 type alias Msg =
@@ -37,6 +38,10 @@ type alias Model =
     }
 
 
+
+-- INIT
+
+
 zero : Score
 zero =
     Score 0
@@ -62,14 +67,72 @@ init =
     ( initialGame, Cmd.none )
 
 
-viewCell : Coordinates -> Cell -> Html Msg
-viewCell coordinates cell =
-    div [ css cellStyle ] []
 
-viewRow : Row Cell -> Html Msg
-viewRow array =
-    div [ css [displayFlex] ] 
-        (Array.toList <| Plane.mapIndexedRow viewCell array)
+-- UTILITY
+
+
+sameCoordinates : Coordinates -> Point a -> Bool
+sameCoordinates c p =
+    Plane.coordinatesEqual (Tuple.first (Plane.fromPoint p)) c
+
+
+
+-- VIEW
+
+
+type CellType
+    = EmptyCell
+    | TargetCell
+    | SnakeCell
+    | WallCell
+
+
+cellType : Model -> Coordinates -> Cell -> CellType
+cellType model coord cell =
+    if List.any (sameCoordinates coord) model.snake then
+        SnakeCell
+
+    else
+        case cell of
+            Empty ->
+                EmptyCell
+
+            Target ->
+                TargetCell
+
+            Wall ->
+                WallCell
+
+
+viewCell : Model -> Coordinates -> Cell -> Html Msg
+viewCell model coordinates cell =
+    let
+        kind =
+            cellType model coordinates cell
+
+        style =
+            case kind of
+                SnakeCell ->
+                    [ backgroundColor green, borderRadius (pct 50) ]
+
+                EmptyCell ->
+                    []
+
+                WallCell ->
+                    [ backgroundColor black ]
+
+                TargetCell ->
+                    [ backgroundColor red ]
+
+    in
+    div [ css (cellStyle ++ style) ] []
+
+
+viewRow : Model -> Row Cell -> Html Msg
+viewRow model array =
+    div [ css [ displayFlex ] ]
+        (Array.toList <| Plane.mapIndexedRow (viewCell model) array)
+
 
 view : Model -> Html Msg
 view model =
@@ -77,10 +140,10 @@ view model =
         [ css
             [ margin auto
             , maxWidth fitContent
+            , backgroundColor grey
             ]
         ]
-        (Plane.mapRows viewRow model.board)
-        
+        (Plane.mapRows (viewRow model) model.board)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -88,10 +151,14 @@ update msg model =
     ( model, Cmd.none )
 
 
+
 -- CSS STYLES
 
+
 cellSize : Em
-cellSize = em 1
+cellSize =
+    em 1
+
 
 cellStyle : List Style
 cellStyle =
@@ -100,3 +167,23 @@ cellStyle =
     , width cellSize
     , height cellSize
     ]
+
+
+grey : Color
+grey =
+    rgb 175 175 175
+
+
+green : Color
+green =
+    rgb 0 255 0
+
+
+black : Color
+black =
+    rgb 0 0 0
+
+
+red : Color
+red =
+    rgb 255 0 0

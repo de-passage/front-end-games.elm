@@ -57,11 +57,11 @@ init : flags -> ( Model, Cmd Msg )
 init _ =
     let
         ( model, command ) =
-            MS.init
+            SK.init
     in
-    ( { gameModel = Minesweeper model
+    ( { gameModel = Snake model
       }
-    , fromMSCmd command
+    , fromSKCmd command
     )
 
 
