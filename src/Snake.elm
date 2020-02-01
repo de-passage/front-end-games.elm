@@ -206,6 +206,15 @@ stringToSpeed string =
 
 
 
+isSnake : Coordinates -> NonEmpty (Point Cell) -> Bool
+isSnake coord snake = liftNE2 List.any (sameCoordinates coord) snake
+
+isTarget : Coordinates -> List (Point Cell) -> Bool
+isTarget coord targets = List.any (sameCoordinates coord) targets 
+
+consNE : a -> NonEmpty a -> NonEmpty a
+consNE a (NonEmpty b r) = NonEmpty a (b :: r)
+
 -- VIEW
 
 
@@ -228,10 +237,10 @@ speedInput model =
 
 cellType : Model -> Coordinates -> Cell -> CellType
 cellType model coord cell =
-    if liftNE2 List.any (sameCoordinates coord) model.snake then
+    if isSnake coord model.snake then
         SnakeCell
 
-    else if List.any (sameCoordinates coord) model.targets then
+    else if isTarget coord model.targets then
         TargetCell
 
     else
@@ -290,7 +299,7 @@ view model =
 -- UPDATE
 
 
-moveSnake : Model -> Model
+moveSnake : Model -> (Model, Cmd Msg)
 moveSnake model =
     let
         dirF =
@@ -307,19 +316,31 @@ moveSnake model =
                 Down ->
                     Plane.wrapPointDown
 
-        newSnake =
-            model.snake
-                |> initNE
-                |> NonEmpty (dirF (headNE model.snake))
+        nextCell = dirF (headNE model.snake)
+
+        coord = Tuple.first <| Plane.fromPoint nextCell
+
+        removeTarget c = List.filter (not << sameCoordinates c) model.targets
     in
-    { model | snake = newSnake }
+    if Plane.at nextCell == Wall || isSnake coord model.snake then
+        init
+    else if isTarget coord model.targets then
+        ({model | targets = removeTarget coord, snake = consNE nextCell model.snake }, Cmd.none)
+    else
+        let
+            newSnake =
+                model.snake
+                    |> initNE
+                    |> NonEmpty nextCell
+        in
+        ({ model | snake = newSnake }, Cmd.none)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick ->
-            ( moveSnake model, Cmd.none )
+            moveSnake model
 
         DirectionChanged d ->
             ( { model | direction = d }, Cmd.none )
@@ -339,7 +360,6 @@ update msg model =
         None ->
             ( model, Cmd.none )
 
-
 addTarget : X -> Y -> Model -> List (Point Cell)
 addTarget x y model =
     let
@@ -349,7 +369,7 @@ addTarget x y model =
         coord =
             Tuple.first (Plane.fromPoint pos)
     in
-    if Plane.at pos == Wall || liftNE2 List.any (sameCoordinates coord) model.snake || List.any (sameCoordinates coord) model.targets then
+    if Plane.at pos == Wall || isSnake coord model.snake || isTarget coord model.targets then
         model.targets
 
     else
