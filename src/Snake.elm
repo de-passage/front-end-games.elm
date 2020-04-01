@@ -1,11 +1,12 @@
 module Snake exposing (Cell(..), Model, Msg, init, subscriptions, update, view)
 
-import Array exposing (Array)
+import Array
 import Browser.Events
 import Css exposing (..)
+import CustomElements as CE
 import Function exposing (..)
-import Html.Styled exposing (Attribute, Html, div, input, text)
-import Html.Styled.Attributes exposing (css, max, min, type_, value)
+import Html.Styled exposing (Html, div)
+import Html.Styled.Attributes as Attributes exposing (css, max, min)
 import Html.Styled.Events exposing (..)
 import Json.Decode as Decode
 import List.Extra as List
@@ -224,15 +225,10 @@ type CellType
     | SnakeCell
     | WallCell
 
-
-number : Int -> List (Attribute msg) -> List (Html msg) -> Html msg
-number val attr content =
-    input (type_ "number" :: (value <| String.fromInt val) :: attr) content
-
-
 speedInput : Model -> Html Msg
 speedInput model =
-    number (fromSpeed model.speed) [ max (String.fromInt <| fromSpeed maxSpeed), min (String.fromInt <| fromSpeed minSpeed), onInput stringToSpeed ] []
+    CE.number (fromSpeed model.speed) [ 
+        Attributes.max (String.fromInt <| fromSpeed maxSpeed), Attributes.min (String.fromInt <| fromSpeed minSpeed), onInput stringToSpeed ] []
 
 
 cellType : Model -> Coordinates -> Cell -> CellType
