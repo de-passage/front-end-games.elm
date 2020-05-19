@@ -4,11 +4,10 @@ import Array
 import Browser.Events
 import Css exposing (..)
 import CustomElements as CE
-import Function exposing (lift2)
 import Html.Events.Extra exposing (targetValueIntParse)
-import Html.Styled exposing (Html, div, option, select, text)
-import Html.Styled.Attributes as Attributes exposing (css, max, min, value)
-import Html.Styled.Events exposing (on, onInput)
+import Html.Styled exposing (Html, button, div, option, select, text)
+import Html.Styled.Attributes as Attributes exposing (css, max, min, selected, value)
+import Html.Styled.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Levels as Levels
 import List.Extra as List
@@ -24,6 +23,7 @@ type Msg
     | SpeedChanged Speed
     | NewTargetTick
     | TargetPositionGenerated ( X, Y )
+    | Stop
     | Restart
     | SetLevel Int
 
@@ -57,6 +57,12 @@ type Level
     | InvalidLevel String
 
 
+type GameStatus
+    = Running
+    | Stopped
+    | Dead
+
+
 type alias Model =
     { board : Plane Cell
     , level : Int
@@ -66,6 +72,7 @@ type alias Model =
     , speed : Speed
     , targets : List (Point Cell)
     , log : String
+    , status : GameStatus
     }
 
 
@@ -124,6 +131,7 @@ initialGame =
     , targets = []
     , level = 0
     , log = ""
+    , status = Stopped
     }
 
 
@@ -273,7 +281,7 @@ levelSelection : Model -> Html Msg
 levelSelection model =
     Html.Styled.select
         [ on "change" (Decode.map SetLevel targetValueIntParse) ]
-        (List.indexedMap (\i m -> option [ value (String.fromInt i) ] [ text ("level " ++ String.fromInt i) ]) levels)
+        (List.indexedMap (\i _ -> option [ value (String.fromInt i), selected (model.level == i) ] [ text ("level " ++ String.fromInt i) ]) levels)
 
 
 cellType : Model -> Coordinates -> Cell -> CellType
@@ -334,16 +342,38 @@ viewOptions model =
 
 view : Model -> Html Msg
 view model =
+    let
+        content =
+            case model.status of
+                Running ->
+                    runningView "Stop"
+
+                Stopped ->
+                    stoppedView
+
+                Dead ->
+                    runningView "Game over"
+
+        runningView txt =
+            [ button [ onClick Stop ] [ text txt ]
+            , div
+                [ css [ backgroundColor grey ]
+                ]
+                (Plane.mapRows (viewRow model) model.board)
+            ]
+
+        stoppedView =
+            [ viewOptions model
+            , button [ onClick Restart ] [ text "Start" ]
+            ]
+    in
     div
         [ css
             [ margin auto
             , maxWidth fitContent
-            , backgroundColor grey
             ]
         ]
-        [ viewOptions model
-        , div [] (Plane.mapRows (viewRow model) model.board)
-        ]
+        content
 
 
 
@@ -377,7 +407,7 @@ moveSnake model =
             List.filter (not << sameCoordinates c) model.targets
     in
     if Plane.at nextCell == Wall || isSnake coord model.snake then
-        init
+        ( { model | status = Dead }, Cmd.none )
 
     else if isTarget coord model.targets then
         ( { model | targets = removeTarget coord, snake = consNE nextCell model.snake }, Cmd.none )
@@ -411,7 +441,10 @@ update msg model =
             ( { model | targets = addTarget x y model }, Cmd.none )
 
         Restart ->
-            init
+            ( { model | status = Running }, Cmd.none )
+
+        Stop ->
+            ( { model | status = Stopped }, Cmd.none )
 
         None ->
             ( model, Cmd.none )
