@@ -5,7 +5,7 @@ import Browser.Events
 import Css exposing (..)
 import CustomElements as CE
 import Html.Events.Extra exposing (targetValueIntParse)
-import Html.Styled exposing (Html, button, div, option, select, text)
+import Html.Styled exposing (Html, button, div, label, option, select, text)
 import Html.Styled.Attributes as Attributes exposing (css, max, min, selected, value)
 import Html.Styled.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
@@ -71,6 +71,7 @@ type alias Model =
     , direction : Direction
     , bufferedDirection : Direction
     , speed : Speed
+    , tickSpeed : Float
     , targets : List (Point Cell)
     , log : String
     , status : GameStatus
@@ -88,12 +89,12 @@ zero =
 
 maxSpeed : Speed
 maxSpeed =
-    Speed 1000
+    Speed 5
 
 
 minSpeed : Speed
 minSpeed =
-    Speed 100
+    Speed 1
 
 
 
@@ -135,7 +136,8 @@ initialGame =
     , score = zero
     , direction = Right
     , bufferedDirection = Right
-    , speed = Speed 500
+    , speed = minSpeed
+    , tickSpeed = makeTickSpeed minSpeed
     , targets = []
     , level = 0
     , log = ""
@@ -148,6 +150,11 @@ init =
     ( initialGame, Cmd.none )
 
 
+makeTickSpeed : Speed -> Float
+makeTickSpeed s =
+    (fromSpeed maxSpeed - fromSpeed s + 1) * 100 |> toFloat
+
+
 
 -- SUBSCRIPTIONS
 
@@ -157,7 +164,7 @@ subscriptions model =
     case model.status of
         Running ->
             Sub.batch
-                [ Time.every (toFloat <| fromSpeed model.speed) (always Tick)
+                [ Time.every model.tickSpeed (always Tick)
                 , Browser.Events.onKeyDown (decodeDirection model)
                 , Time.every 1800 (always NewTargetTick)
                 ]
@@ -233,7 +240,7 @@ initNE : NonEmpty a -> List a
 initNE (NonEmpty a r) =
     case List.init r of
         Nothing ->
-            [ a ] 
+            [ a ]
 
         Just l ->
             a :: l
@@ -267,6 +274,11 @@ isTarget coord targets =
 consNE : a -> NonEmpty a -> NonEmpty a
 consNE a (NonEmpty b r) =
     NonEmpty a (b :: r)
+
+
+fromScore : Score -> Int
+fromScore (Score s) =
+    s
 
 
 
@@ -347,9 +359,14 @@ viewOptions : Model -> Html Msg
 viewOptions model =
     div
         []
-        [ speedInput model
-        , levelSelection model
-        , text model.log
+        [ div []
+            [ label [] [ text "Speed" ]
+            , speedInput model
+            ]
+        , div []
+            [ levelSelection model
+            , text model.log
+            ]
         ]
 
 
@@ -369,6 +386,7 @@ view model =
 
         runningView txt =
             [ button [ onClick Stop ] [ text txt ]
+            , div [] [ text "Score: ", text (String.fromInt (fromScore model.score)) ]
             , div
                 [ css [ backgroundColor grey ]
                 ]
@@ -423,7 +441,14 @@ moveSnake model =
         ( { model | status = Dead }, Cmd.none )
 
     else if isTarget coord model.targets then
-        ( { model | targets = removeTarget coord, snake = consNE nextCell model.snake }, Cmd.none )
+        ( { model
+            | targets = removeTarget coord
+            , snake = consNE nextCell model.snake
+            , score = Score (fromScore model.score + (501 - floor model.tickSpeed))
+            , tickSpeed = model.tickSpeed * 0.95
+          }
+        , Cmd.none
+        )
 
     else
         let
@@ -441,20 +466,20 @@ restart model =
         s =
             makeSnake model.board
     in
-        { model | snake = s, status = Running, targets = [], direction = Right }
+    { model | snake = s, status = Running, targets = [], direction = Right }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick ->
-            moveSnake  { model | direction = model.bufferedDirection }
+            moveSnake { model | direction = model.bufferedDirection }
 
         DirectionChanged d ->
             ( { model | bufferedDirection = d }, Cmd.none )
 
         SpeedChanged s ->
-            ( { model | speed = s }, Cmd.none )
+            ( { model | speed = s, tickSpeed = makeTickSpeed s }, Cmd.none )
 
         NewTargetTick ->
             ( model, generateNewTarget model )
