@@ -4,11 +4,13 @@ import Array
 import Browser.Events
 import Css exposing (..)
 import CustomElements as CE
-import Function exposing (..)
-import Html.Styled exposing (Html, div)
-import Html.Styled.Attributes as Attributes exposing (css, max, min)
-import Html.Styled.Events exposing (..)
+import Function exposing (lift2)
+import Html.Events.Extra exposing (targetValueIntParse)
+import Html.Styled exposing (Html, div, option, select, text)
+import Html.Styled.Attributes as Attributes exposing (css, max, min, value)
+import Html.Styled.Events exposing (on, onInput)
 import Json.Decode as Decode
+import Levels as Levels
 import List.Extra as List
 import Plane exposing (Coordinates, Height(..), Plane, Point, Row, Width(..), X(..), Y(..))
 import Random
@@ -23,6 +25,7 @@ type Msg
     | NewTargetTick
     | TargetPositionGenerated ( X, Y )
     | Restart
+    | SetLevel Int
 
 
 type Cell
@@ -49,13 +52,20 @@ type NonEmpty a
     = NonEmpty a (List a)
 
 
+type Level
+    = Level (Plane Cell)
+    | InvalidLevel String
+
+
 type alias Model =
     { board : Plane Cell
+    , level : Int
     , snake : NonEmpty (Point Cell)
     , score : Score
     , direction : Direction
     , speed : Speed
     , targets : List (Point Cell)
+    , log : String
     }
 
 
@@ -82,11 +92,26 @@ minSpeed =
 -- INIT
 
 
+height : Height
+height =
+    Height 20
+
+
+width : Width
+width =
+    Width 50
+
+
+emptyPlane : Plane Cell
+emptyPlane =
+    Plane.defaultInitialize height width Empty
+
+
 initialGame : Model
 initialGame =
     let
         b =
-            Plane.defaultInitialize (Height 20) (Width 50) Empty
+            emptyPlane
 
         s0 =
             Plane.clampToPoint (X 0) (Y 0) b
@@ -97,6 +122,8 @@ initialGame =
     , direction = Right
     , speed = Speed 500
     , targets = []
+    , level = 0
+    , log = ""
     }
 
 
@@ -206,15 +233,21 @@ stringToSpeed string =
             SpeedChanged (Speed i)
 
 
-
 isSnake : Coordinates -> NonEmpty (Point Cell) -> Bool
-isSnake coord snake = liftNE2 List.any (sameCoordinates coord) snake
+isSnake coord snake =
+    liftNE2 List.any (sameCoordinates coord) snake
+
 
 isTarget : Coordinates -> List (Point Cell) -> Bool
-isTarget coord targets = List.any (sameCoordinates coord) targets 
+isTarget coord targets =
+    List.any (sameCoordinates coord) targets
+
 
 consNE : a -> NonEmpty a -> NonEmpty a
-consNE a (NonEmpty b r) = NonEmpty a (b :: r)
+consNE a (NonEmpty b r) =
+    NonEmpty a (b :: r)
+
+
 
 -- VIEW
 
@@ -225,10 +258,22 @@ type CellType
     | SnakeCell
     | WallCell
 
+
 speedInput : Model -> Html Msg
 speedInput model =
-    CE.number (fromSpeed model.speed) [ 
-        Attributes.max (String.fromInt <| fromSpeed maxSpeed), Attributes.min (String.fromInt <| fromSpeed minSpeed), onInput stringToSpeed ] []
+    CE.number (fromSpeed model.speed)
+        [ Attributes.max (String.fromInt <| fromSpeed maxSpeed)
+        , Attributes.min (String.fromInt <| fromSpeed minSpeed)
+        , onInput stringToSpeed
+        ]
+        []
+
+
+levelSelection : Model -> Html Msg
+levelSelection model =
+    Html.Styled.select
+        [ on "change" (Decode.map SetLevel targetValueIntParse) ]
+        (List.indexedMap (\i m -> option [ value (String.fromInt i) ] [ text ("level " ++ String.fromInt i) ]) levels)
 
 
 cellType : Model -> Coordinates -> Cell -> CellType
@@ -277,6 +322,16 @@ viewRow model array =
         (Array.toList <| Plane.mapIndexedRow (viewCell model) array)
 
 
+viewOptions : Model -> Html Msg
+viewOptions model =
+    div
+        []
+        [ speedInput model
+        , levelSelection model
+        , text model.log
+        ]
+
+
 view : Model -> Html Msg
 view model =
     div
@@ -286,16 +341,16 @@ view model =
             , backgroundColor grey
             ]
         ]
-        (speedInput model
-            :: Plane.mapRows (viewRow model) model.board
-        )
+        [ viewOptions model
+        , div [] (Plane.mapRows (viewRow model) model.board)
+        ]
 
 
 
 -- UPDATE
 
 
-moveSnake : Model -> (Model, Cmd Msg)
+moveSnake : Model -> ( Model, Cmd Msg )
 moveSnake model =
     let
         dirF =
@@ -312,16 +367,21 @@ moveSnake model =
                 Down ->
                     Plane.wrapPointDown
 
-        nextCell = dirF (headNE model.snake)
+        nextCell =
+            dirF (headNE model.snake)
 
-        coord = Tuple.first <| Plane.fromPoint nextCell
+        coord =
+            Tuple.first <| Plane.fromPoint nextCell
 
-        removeTarget c = List.filter (not << sameCoordinates c) model.targets
+        removeTarget c =
+            List.filter (not << sameCoordinates c) model.targets
     in
     if Plane.at nextCell == Wall || isSnake coord model.snake then
         init
+
     else if isTarget coord model.targets then
-        ({model | targets = removeTarget coord, snake = consNE nextCell model.snake }, Cmd.none)
+        ( { model | targets = removeTarget coord, snake = consNE nextCell model.snake }, Cmd.none )
+
     else
         let
             newSnake =
@@ -329,7 +389,7 @@ moveSnake model =
                     |> initNE
                     |> NonEmpty nextCell
         in
-        ({ model | snake = newSnake }, Cmd.none)
+        ( { model | snake = newSnake }, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -350,11 +410,30 @@ update msg model =
         TargetPositionGenerated ( x, y ) ->
             ( { model | targets = addTarget x y model }, Cmd.none )
 
-        Restart -> 
+        Restart ->
             init
 
         None ->
             ( model, Cmd.none )
+
+        SetLevel i ->
+            case List.getAt i levels of
+                Nothing ->
+                    ( { model | log = "Invalid i received: " ++ String.fromInt i }, Cmd.none )
+
+                Just level ->
+                    validLevelFrom model i level
+
+
+validLevelFrom : Model -> Int -> Level -> ( Model, Cmd Msg )
+validLevelFrom m i l =
+    case l of
+        InvalidLevel s ->
+            ( { m | board = emptyPlane, log = s }, Cmd.none )
+
+        Level lv ->
+            ( { m | board = lv, log = "" }, Cmd.none )
+
 
 addTarget : X -> Y -> Model -> List (Point Cell)
 addTarget x y model =
@@ -401,8 +480,8 @@ cellStyle : List Style
 cellStyle =
     [ overflow hidden
     , textOverflow ellipsis
-    , width cellSize
-    , height cellSize
+    , Css.width cellSize
+    , Css.height cellSize
     ]
 
 
@@ -424,3 +503,50 @@ black =
 red : Color
 red =
     rgb 255 0 0
+
+
+
+-- LEVELS
+
+
+levels : List Level
+levels =
+    let
+        cellFromEnum i =
+            if i == 0 then
+                Empty
+
+            else
+                Wall
+
+        lvl0 =
+            Array.initialize (20 * 50) (always 0)
+
+        lvl1 =
+            Array.fromList
+                Levels.level1
+
+        lvl2 =
+            Array.fromList
+                Levels.level2
+
+        lvl3 =
+            Array.fromList
+                Levels.level3
+
+        lvls =
+            [ lvl0, lvl1, lvl2, lvl3 ]
+
+        toLevel l =
+            case
+                l
+                    |> Array.map cellFromEnum
+                    |> Plane.fromArray height width Empty
+            of
+                Nothing ->
+                    InvalidLevel "Level height/width don't match list representation."
+
+                Just p ->
+                    Level p
+    in
+    List.map toLevel lvls

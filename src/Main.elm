@@ -61,11 +61,11 @@ init : flags -> ( Model, Cmd Msg )
 init _ =
     let
         ( model, command ) =
-            GAN.init
+            SK.init
     in
-    ( { gameModel = GuessANumber model
+    ( { gameModel = Snake model
       }
-    , fromGANCmd command
+    , fromSKCmd command
     )
 
 
@@ -321,7 +321,7 @@ tabsFor model =
             [ ( "Minesweeper", MinesweeperT )
             , ( "TicTacToe", TicTacToeT )
             , ( "Snake", SnakeT )
-            , ( "Guess a number", GuessANumberT )
+            -- , ( "Guess a number", GuessANumberT )
             ]
 
         tabStyle tag =

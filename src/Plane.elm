@@ -2,20 +2,21 @@ module Plane exposing
     ( Coordinates
     , Height(..)
     , Plane
+    , Point
+    , Row
     , Width(..)
     , X(..)
     , Y(..)
-    , Row
-    , Point
     , at
     , clampAt
     , clampSetAt
     , clampToCoordinates
     , clampToPoint
     , clampUpdateAt
+    , coordinatesEqual
     , defaultInitialize
     , down
-    , coordinatesEqual
+    , fromArray
     , fromCoordinates
     , fromPoint
     , get
@@ -40,16 +41,16 @@ module Plane exposing
     , width
     , wrapAt
     , wrapDown
-    , wrapPointDown
     , wrapLeft
+    , wrapPointDown
     , wrapPointLeft
-    , wrapRight
     , wrapPointRight
+    , wrapPointUp
+    , wrapRight
     , wrapSetAt
     , wrapToCoordinates
     , wrapToPoint
     , wrapUp
-    , wrapPointUp
     , wrapUpdateAt
     )
 
@@ -84,8 +85,9 @@ type Point a
     = Point Coordinates (Plane a)
 
 
-type Row a 
+type Row a
     = Row (Array a) X Width
+
 
 initialize : Height -> Width -> (Coordinates -> a) -> Plane a
 initialize (Height h) (Width w) f =
@@ -105,6 +107,19 @@ initialize (Height h) (Width w) f =
                 h
     in
     Plane (Array.initialize (h1 * w1) (\i -> f (C i))) (Height h1) (Width w1) (f (C 0))
+
+
+fromArray : Height -> Width -> a -> Array a -> Maybe (Plane a)
+fromArray ((Height h) as hh) ((Width w) as ww) d a =
+    let
+        tot =
+            h * w
+    in
+    if tot == Array.length a then
+        Just <| Plane a hh ww d
+
+    else
+        Maybe.Nothing
 
 
 defaultInitialize : Height -> Width -> a -> Plane a
@@ -127,12 +142,12 @@ fromCoordinates (C i) (Plane _ _ (Width w) _) =
 
 
 toPoint : X -> Y -> Plane a -> Maybe (Point a)
-toPoint (X x) (Y y) (Plane p (Height h) (Width w) d) =
+toPoint (X x) (Y y) (Plane p ((Height h) as hh) ((Width w) as ww) d) =
     if x < 0 || y < 0 || x >= h || y >= w then
         Nothing
 
     else
-        Just (Point (C (x * w + y)) (Plane p (Height h) (Width w) d))
+        Just (Point (C (x * w + y)) (Plane p hh ww d))
 
 
 fromPoint : Point a -> ( Coordinates, Plane a )
@@ -318,64 +333,83 @@ wrapDown : X -> Y -> Plane a -> Point a
 wrapDown (X x) y =
     wrapToPoint (X (x + 1)) y
 
+
 wrapPointUp : Point a -> Point a
 wrapPointUp (Point c plane) =
-    let (x, y) = fromCoordinates c plane
-    in 
-        wrapUp x y plane
+    let
+        ( x, y ) =
+            fromCoordinates c plane
+    in
+    wrapUp x y plane
+
 
 wrapPointDown : Point a -> Point a
 wrapPointDown (Point c plane) =
-    let (x, y) = fromCoordinates c plane
-    in 
-        wrapDown x y plane
+    let
+        ( x, y ) =
+            fromCoordinates c plane
+    in
+    wrapDown x y plane
+
 
 wrapPointLeft : Point a -> Point a
 wrapPointLeft (Point c plane) =
-    let (x, y) = fromCoordinates c plane
-    in 
-        wrapLeft x y plane
+    let
+        ( x, y ) =
+            fromCoordinates c plane
+    in
+    wrapLeft x y plane
+
 
 wrapPointRight : Point a -> Point a
 wrapPointRight (Point c plane) =
-    let (x, y) = fromCoordinates c plane
-    in 
-        wrapRight x y plane
+    let
+        ( x, y ) =
+            fromCoordinates c plane
+    in
+    wrapRight x y plane
+
 
 toArray : Plane a -> Array (Point a)
-toArray (Plane b h w d) = 
+toArray (Plane b h w d) =
     Array.indexedMap (\i _ -> Point (C i) (Plane b h w d)) b
 
+
 toList : Plane a -> List (Point a)
-toList = toArray >> Array.toList
+toList =
+    toArray >> Array.toList
+
 
 mapRows : (Row a -> b) -> Plane a -> List b
-mapRows f (Plane b _ (Width w) _) = 
+mapRows f (Plane b _ (Width w) _) =
     let
-        loop curr arr acc = 
+        loop curr arr acc =
             if Array.length arr <= curr then
                 List.reverse acc
-            
+
             else
                 loop (curr + w) arr (f (Row (Array.slice curr (curr + w) arr) (X (curr // w)) (Width w)) :: acc)
-    in 
-        loop 0 b []
+    in
+    loop 0 b []
+
 
 mapIndexedRow : (Coordinates -> a -> b) -> Row a -> Array b
 mapIndexedRow f (Row arr (X x) (Width w)) =
     Array.indexedMap (\y v -> f (C (x * w + y)) v) arr
 
-    
 
 map : (a -> b) -> Plane a -> Plane b
-map f (Plane b h w d) = 
-    Array.map f b 
-    |> \b1 -> Plane b1 h w (f d)
+map f (Plane b h w d) =
+    Array.map f b
+        |> (\b1 -> Plane b1 h w (f d))
+
 
 mapIndexed : (Coordinates -> a -> b) -> Plane a -> Plane b
-mapIndexed f (Plane b h w d) = 
-    Array.indexedMap (\c v-> f (C c) v) b 
-    |> \b1 -> Plane b1 h w (f (C -1) d)
+mapIndexed f (Plane b h w d) =
+    Array.indexedMap (\c v -> f (C c) v) b
+        |> (\b1 -> Plane b1 h w (f (C -1) d))
+
 
 coordinatesEqual : Coordinates -> Coordinates -> Bool
-coordinatesEqual (C a) (C b) = a == b
+coordinatesEqual (C a) (C b) =
+    a == b
