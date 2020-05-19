@@ -114,17 +114,23 @@ emptyPlane =
     Plane.defaultInitialize height width Empty
 
 
+makeSnake : Plane Cell -> NonEmpty (Point Cell)
+makeSnake b =
+    let
+        s0 =
+            Plane.clampToPoint (X 1) (Y 1) b
+    in
+    NonEmpty s0 (List.repeat 3 s0)
+
+
 initialGame : Model
 initialGame =
     let
         b =
             emptyPlane
-
-        s0 =
-            Plane.clampToPoint (X 0) (Y 0) b
     in
     { board = b
-    , snake = NonEmpty s0 (List.repeat 3 s0)
+    , snake = makeSnake b
     , score = zero
     , direction = Right
     , speed = Speed 500
@@ -146,11 +152,16 @@ init =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch
-        [ Time.every (toFloat <| fromSpeed model.speed) (always Tick)
-        , Browser.Events.onKeyDown (decodeDirection model)
-        , Time.every 1800 (always NewTargetTick)
-        ]
+    case model.status of
+        Running ->
+            Sub.batch
+                [ Time.every (toFloat <| fromSpeed model.speed) (always Tick)
+                , Browser.Events.onKeyDown (decodeDirection model)
+                , Time.every 1800 (always NewTargetTick)
+                ]
+
+        _ ->
+            Sub.none
 
 
 decodeDirection : Model -> Decode.Decoder Msg
@@ -422,6 +433,15 @@ moveSnake model =
         ( { model | snake = newSnake }, Cmd.none )
 
 
+restart : Model -> Model
+restart model =
+    let
+        s =
+            makeSnake model.board
+    in
+        { model | snake = s, status = Running, targets = [], direction = Right }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -441,7 +461,7 @@ update msg model =
             ( { model | targets = addTarget x y model }, Cmd.none )
 
         Restart ->
-            ( { model | status = Running }, Cmd.none )
+            ( restart model, Cmd.none )
 
         Stop ->
             ( { model | status = Stopped }, Cmd.none )
