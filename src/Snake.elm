@@ -69,6 +69,7 @@ type alias Model =
     , snake : NonEmpty (Point Cell)
     , score : Score
     , direction : Direction
+    , bufferedDirection : Direction
     , speed : Speed
     , targets : List (Point Cell)
     , log : String
@@ -133,6 +134,7 @@ initialGame =
     , snake = makeSnake b
     , score = zero
     , direction = Right
+    , bufferedDirection = Right
     , speed = Speed 500
     , targets = []
     , level = 0
@@ -231,7 +233,7 @@ initNE : NonEmpty a -> List a
 initNE (NonEmpty a r) =
     case List.init r of
         Nothing ->
-            []
+            [ a ] 
 
         Just l ->
             a :: l
@@ -446,10 +448,10 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick ->
-            moveSnake model
+            moveSnake  { model | direction = model.bufferedDirection }
 
         DirectionChanged d ->
-            ( { model | direction = d }, Cmd.none )
+            ( { model | bufferedDirection = d }, Cmd.none )
 
         SpeedChanged s ->
             ( { model | speed = s }, Cmd.none )
