@@ -2,12 +2,12 @@ module Minesweeper exposing (Model, Msg, init, update, view)
 
 import Array exposing (Array)
 import Css exposing (..)
-import Dict exposing (Dict)
+import CustomElements as CE
 import Function as F
 import Html.Events.Extra
-import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, legend, text)
-import Html.Styled.Attributes exposing (css, for, max, min, name, type_, value)
-import Html.Styled.Events exposing (onClick, onDoubleClick, preventDefaultOn, onInput)
+import Html.Styled exposing (Attribute, Html, button, div, fieldset, label, legend, text)
+import Html.Styled.Attributes as Attributes exposing (css, for, max, min, name)
+import Html.Styled.Events exposing (onClick, onDoubleClick, onInput, preventDefaultOn)
 import Json.Decode as Json
 import List.Extra as List
 import Maybe.Extra as Maybe
@@ -17,7 +17,7 @@ import Wrapped as W exposing (..)
 
 onChange : (String -> msg) -> Attribute msg
 onChange =
-    Html.Styled.Attributes.fromUnstyled << Html.Events.Extra.onChange
+    Attributes.fromUnstyled << Html.Events.Extra.onChange
 
 
 type Cell
@@ -120,12 +120,6 @@ type alias MineCount =
 -- VIEW
 -- Inputs
 
-
-number : Int -> List (Attribute msg) -> List (Html msg) -> Html msg
-number val attr content =
-    input (type_ "number" :: (value <| String.fromInt val) :: attr) content
-
-
 msgWithDefault : (WrappedI a -> Msg) -> WrappedI a -> String -> Msg
 msgWithDefault toMsg default received =
     case String.toInt received of
@@ -151,7 +145,7 @@ customInput get toMsg model attributes =
         v =
             get model
     in
-    number (W.extract v) (onChange (msgWithDefault toMsg v) :: onInput (msgWithDefault toMsg v) :: attributes) []
+    CE.number (W.extract v) (onChange (msgWithDefault toMsg v) :: onInput (msgWithDefault toMsg v) :: attributes) []
 
 
 heightInput : Model -> List (Attribute Msg) -> Html Msg
@@ -369,15 +363,27 @@ view model =
                 [ legend [] [ text "Options" ]
                 , div [ css optionStyle ]
                     [ label [ for "height", css [ marginRight (em 1) ] ] [ text "Rows" ]
-                    , heightInput model [ name "height", min <| String.fromInt sizeMin, max <| String.fromInt sizeMax ]
+                    , heightInput model
+                        [ name "height"
+                        , Attributes.min <| String.fromInt sizeMin
+                        , Attributes.max <| String.fromInt sizeMax
+                        ]
                     ]
                 , div [ css optionStyle ]
                     [ label [ for "width", css [ marginRight (em 1) ] ] [ text "Columns" ]
-                    , widthInput model [ name "width", min <| String.fromInt sizeMin, max <| String.fromInt sizeMax ]
+                    , widthInput model
+                        [ name "width"
+                        , Attributes.min <| String.fromInt sizeMin
+                        , Attributes.max <| String.fromInt sizeMax
+                        ]
                     ]
                 , div [ css optionStyle ]
                     [ label [ for "mines", css [ marginRight (em 1) ] ] [ text "Number of mines" ]
-                    , mineInput model [ name "mines" ]
+                    , mineInput model
+                        [ name "mines"
+                        , Attributes.min <| String.fromInt sizeMin
+                        , Attributes.max <| String.fromInt sizeMax
+                        ]
                     ]
                 ]
             ]
@@ -700,11 +706,16 @@ clampW =
     W.liftW (clamp sizeMin sizeMax)
 
 
+maxMineCount : BoardHeight -> BoardWidth -> Int
+maxMineCount h w =
+    W.lift2 (*) h w * 9 // 10
+
+
 clampM : BoardHeight -> BoardWidth -> MineCount -> MineCount
 clampM h w m =
     let
         ma =
-            W.lift2 (*) h w * 9 // 10
+            maxMineCount h w
     in
     W.liftW (clamp 1 ma) m
 

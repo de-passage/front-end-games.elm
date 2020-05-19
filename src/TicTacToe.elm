@@ -4,8 +4,8 @@ import Array exposing (Array)
 import Css exposing (..)
 import Defered exposing (..)
 import Html.Events.Extra as Events
-import Html.Styled exposing (Attribute, Html, button, div, fieldset, input, label, table, tbody, td, text, tr)
-import Html.Styled.Attributes exposing (checked, css, name, type_)
+import Html.Styled as Html exposing (Attribute, Html, button, div, fieldset, input, label, table, tbody, td, text, tr)
+import Html.Styled.Attributes as Attributes exposing (checked, css, name, type_)
 import Html.Styled.Events exposing (onClick)
 import List.Extra as List
 import Maybe.Extra as Maybe
@@ -103,7 +103,7 @@ type alias Victory =
 
 onChange : (String -> msg) -> Attribute msg
 onChange =
-    Html.Styled.Attributes.fromUnstyled << Events.onChange
+    Attributes.fromUnstyled << Events.onChange
 
 
 isRunning : GameState -> Bool
@@ -296,7 +296,7 @@ computeNextMove board player =
         getPosition b p =
             let
                 ( _, _, position ) =
-                    bestMove board player 0
+                    bestMove b p 0
             in
             position
     in
@@ -427,7 +427,7 @@ viewRow m cells =
 
 viewBoard : Model -> List (Array IndexedCell) -> Html Msg
 viewBoard m b =
-    table [ tableStyle ] [ tbody [] (List.map (viewRow m) b) ]
+    Html.table [ tableStyle ] [ tbody [] (List.map (viewRow m) b) ]
 
 
 viewGame : Model -> List (Html Msg) -> Html Msg
@@ -506,7 +506,7 @@ controllerSelection model id lbl player =
         mkRadio n c =
             radio n id (isCtrldBy c) (setOpts c)
     in
-    Html.Styled.fieldset []
+    Html.fieldset []
         [ label [] [ text lbl ]
         , mkRadio "Human" Human
         , mkRadio "Computer" Computer
@@ -516,7 +516,7 @@ controllerSelection model id lbl player =
 radio : String -> String -> Bool -> Msg -> Html Msg
 radio value group isChecked msg =
     label []
-        [ input [ type_ "radio", name group, onChange (always msg), checked isChecked ] []
+        [ input [ type_ "radio", name group, onChange (always msg), Attributes.checked isChecked ] []
         , text value
         ]
 

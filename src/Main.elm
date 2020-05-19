@@ -3,6 +3,7 @@ module Main exposing (Model, Msg, init, main, subscriptions, update, view)
 import Browser
 import Css exposing (..)
 import Function
+import GuessANumber as GAN
 import Html.Styled as Html exposing (..)
 import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
@@ -25,12 +26,14 @@ type GameModel
     = TicTacToe TTT.Model
     | Minesweeper MS.Model
     | Snake SK.Model
+    | GuessANumber GAN.Model
 
 
 type GameTag
     = TicTacToeT
     | MinesweeperT
     | SnakeT
+    | GuessANumberT
 
 
 type alias Model =
@@ -42,6 +45,7 @@ type ExtMsg
     = TicTacToeMsg TTT.Msg
     | MinesweeperMsg MS.Msg
     | SnakeMsg SK.Msg
+    | GuessANumberMsg GAN.Msg
 
 
 type Msg
@@ -57,11 +61,11 @@ init : flags -> ( Model, Cmd Msg )
 init _ =
     let
         ( model, command ) =
-            MS.init
+            SK.init
     in
-    ( { gameModel = Minesweeper model
+    ( { gameModel = Snake model
       }
-    , fromMSCmd command
+    , fromSKCmd command
     )
 
 
@@ -76,6 +80,9 @@ initialGame tag =
 
         SnakeT ->
             SK.init |> Tuple.mapBoth Snake fromSKCmd
+
+        GuessANumberT ->
+            GAN.init |> Tuple.mapBoth GuessANumber fromGANCmd
 
 
 
@@ -112,6 +119,11 @@ fromSKCmd =
     adaptCmd SnakeMsg
 
 
+fromGANCmd : Cmd GAN.Msg -> Cmd Msg
+fromGANCmd =
+    adaptCmd GuessANumberMsg
+
+
 fromTTTHtml : Html TTT.Msg -> Html Msg
 fromTTTHtml =
     adaptHtml TicTacToeMsg
@@ -127,15 +139,21 @@ fromSKHtml =
     adaptHtml SnakeMsg
 
 
+fromGANHtml : Html GAN.Msg -> Html Msg
+fromGANHtml =
+    adaptHtml GuessANumberMsg
+
+
 dispatchUpdate :
     ExtMsg
     -> a
     -> (TTT.Msg -> TTT.Model -> a)
     -> (MS.Msg -> MS.Model -> a)
     -> (SK.Msg -> SK.Model -> a)
+    -> (GAN.Msg -> GAN.Model -> a)
     -> GameModel
     -> a
-dispatchUpdate msg default ttt ms sk model =
+dispatchUpdate msg default ttt ms sk gan model =
     case msg of
         TicTacToeMsg msg1 ->
             case model of
@@ -161,6 +179,14 @@ dispatchUpdate msg default ttt ms sk model =
                 _ ->
                     default
 
+        GuessANumberMsg msg1 ->
+            case model of
+                GuessANumber m ->
+                    gan msg1 m
+
+                _ ->
+                    default
+
 
 gameType : GameModel -> GameTag
 gameType model =
@@ -173,6 +199,9 @@ gameType model =
 
         Snake _ ->
             SnakeT
+
+        GuessANumber _ ->
+            GuessANumberT
 
 
 isGame : GameTag -> GameModel -> Bool
@@ -223,6 +252,15 @@ updateSK =
     mapUpdate SK.update SnakeMsg Snake
 
 
+updateGAN :
+    Model
+    -> GAN.Msg
+    -> GAN.Model
+    -> ( Model, Cmd Msg )
+updateGAN =
+    mapUpdate GAN.update GuessANumberMsg GuessANumber
+
+
 noCmd : a -> ( a, Cmd msg )
 noCmd a =
     ( a, Cmd.none )
@@ -242,7 +280,15 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ExternalMessage msg1 ->
-            Function.lift5 (dispatchUpdate msg1) noCmd updateTTT updateMS updateSK getGame <| model
+            Function.lift6
+                (dispatchUpdate msg1)
+                noCmd
+                updateTTT
+                updateMS
+                updateSK
+                updateGAN
+                getGame
+                model
 
         GameChanged newGame ->
             initialGame newGame
@@ -250,8 +296,13 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model.gameModel of
+        Snake m ->
+            Sub.map (SnakeMsg >> ExternalMessage) (SK.subscriptions m)
+
+        _ ->
+            Sub.none
 
 
 view : Model -> Browser.Document Msg
@@ -270,6 +321,7 @@ tabsFor model =
             [ ( "Minesweeper", MinesweeperT )
             , ( "TicTacToe", TicTacToeT )
             , ( "Snake", SnakeT )
+            -- , ( "Guess a number", GuessANumberT )
             ]
 
         tabStyle tag =
@@ -319,6 +371,9 @@ gameView m =
 
         Snake model ->
             div [] [ fromSKHtml (SK.view model) ]
+        
+        GuessANumber model ->
+            div [] [ fromGANHtml (GAN.view model)]
 
 
 
