@@ -5,7 +5,7 @@ import Browser.Events
 import Css exposing (..)
 import CustomElements as CE
 import Html.Events.Extra exposing (targetValueIntParse)
-import Html.Styled exposing (Html, button, div, label, option, select, text)
+import Html.Styled exposing (Html, button, div, input, label, li, option, select, text, ul)
 import Html.Styled.Attributes as Attributes exposing (css, max, min, selected, value)
 import Html.Styled.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
@@ -25,7 +25,9 @@ type Msg
     | TargetPositionGenerated ( X, Y )
     | Stop
     | Restart
+    | Died
     | SetLevel Int
+    | NameChanged String
 
 
 type Cell
@@ -75,6 +77,8 @@ type alias Model =
     , targets : List (Point Cell)
     , log : String
     , status : GameStatus
+    , highScores : List ( Score, String )
+    , name : String
     }
 
 
@@ -142,6 +146,8 @@ initialGame =
     , level = 0
     , log = ""
     , status = Stopped
+    , highScores = []
+    , name = ""
     }
 
 
@@ -370,32 +376,74 @@ viewOptions model =
         ]
 
 
+viewScores : Model -> Html Msg
+viewScores model =
+    let
+        showScore ( s, n ) =
+            li
+                [ css
+                    [ displayFlex
+                    , justifyContent spaceBetween
+                    ]
+                ]
+                [ div [ css [ maxWidth (pct 50) ] ] [ text n ]
+                , div [ css [ maxWidth (pct 50) ] ] [ text (String.fromInt (fromScore s)) ]
+                ]
+
+        scores =
+            case model.highScores of
+                [] ->
+                    [ text "No scores yet" ]
+
+                l ->
+                    List.map showScore l
+    in
+    ul
+        [ css
+            [ maxWidth (pct 100)
+            , listStyle none
+            , padding (px 0)
+            ]
+        ]
+        scores
+
+
 view : Model -> Html Msg
 view model =
     let
         content =
             case model.status of
                 Running ->
-                    runningView "Stop"
+                    runningView
 
                 Stopped ->
                     stoppedView
 
                 Dead ->
-                    runningView "Game over"
+                    deadView
 
-        runningView txt =
-            [ button [ onClick Stop ] [ text txt ]
-            , div [] [ text "Score: ", text (String.fromInt (fromScore model.score)) ]
+        baseRunningView =
+            [ div [] [ text "Score: ", text (String.fromInt (fromScore model.score)) ]
             , div
                 [ css [ backgroundColor grey ]
                 ]
                 (Plane.mapRows (viewRow model) model.board)
             ]
 
+        runningView =
+            button [ onClick Stop ] [ text "Stop" ] :: baseRunningView
+
+        deadView =
+            div []
+                [ input [ onInput NameChanged ] []
+                , button [ onClick Died ] [ text "Game Over" ]
+                ]
+                :: (baseRunningView ++ [ viewScores model ])
+
         stoppedView =
             [ viewOptions model
             , button [ onClick Restart ] [ text "Start" ]
+            , viewScores model
             ]
     in
     div
@@ -473,6 +521,7 @@ restart model =
         , direction = Right
         , bufferedDirection = Right
         , tickSpeed = makeTickSpeed model.speed
+        , score = zero
     }
 
 
@@ -500,6 +549,15 @@ update msg model =
         Stop ->
             ( { model | status = Stopped }, Cmd.none )
 
+        Died ->
+            let
+                scores =
+                    model.highScores
+                        |> (\s -> ( model.score, model.name ) :: s)
+                        |> List.sortBy (Tuple.first >> fromScore >> negate)
+            in
+            ( { model | status = Stopped, highScores = scores }, Cmd.none )
+
         None ->
             ( model, Cmd.none )
 
@@ -510,6 +568,9 @@ update msg model =
 
                 Just level ->
                     validLevelFrom model i level
+
+        NameChanged n ->
+            ( { model | name = n }, Cmd.none )
 
 
 validLevelFrom : Model -> Int -> Level -> ( Model, Cmd Msg )
