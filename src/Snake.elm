@@ -466,7 +466,14 @@ restart model =
         s =
             makeSnake model.board
     in
-    { model | snake = s, status = Running, targets = [], direction = Right }
+    { model
+        | snake = s
+        , status = Running
+        , targets = []
+        , direction = Right
+        , bufferedDirection = Right
+        , tickSpeed = makeTickSpeed model.speed
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -509,7 +516,7 @@ validLevelFrom : Model -> Int -> Level -> ( Model, Cmd Msg )
 validLevelFrom m i l =
     case l of
         InvalidLevel s ->
-            ( { m | board = emptyPlane, log = s }, Cmd.none )
+            ( { m | board = emptyPlane, log = s ++ "(level " ++ String.fromInt i ++ ")" }, Cmd.none )
 
         Level lv ->
             ( { m | board = lv, log = "" }, Cmd.none )
