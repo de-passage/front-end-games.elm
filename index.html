@@ -798,11 +798,11 @@ function _Debug_crash_UNUSED(identifier, fact1, fact2, fact3, fact4)
 
 function _Debug_regionToString(region)
 {
-	if (region.bm.aK === region.bF.aK)
+	if (region.bo.aN === region.bH.aN)
 	{
-		return 'on line ' + region.bm.aK;
+		return 'on line ' + region.bo.aN;
 	}
-	return 'on lines ' + region.bm.aK + ' through ' + region.bF.aK;
+	return 'on lines ' + region.bo.aN + ' through ' + region.bH.aN;
 }
 
 
@@ -1871,9 +1871,9 @@ var _Platform_worker = F4(function(impl, flagDecoder, debugMetadata, args)
 	return _Platform_initialize(
 		flagDecoder,
 		args,
-		impl.cw,
-		impl.cJ,
-		impl.cH,
+		impl.cy,
+		impl.cK,
+		impl.cI,
 		function() { return function() {} }
 	);
 });
@@ -2719,8 +2719,8 @@ var _VirtualDom_mapEventRecord = F2(function(func, record)
 {
 	return {
 		R: func(record.R),
-		bn: record.bn,
-		bk: record.bk
+		bp: record.bp,
+		bm: record.bm
 	}
 });
 
@@ -2989,10 +2989,10 @@ function _VirtualDom_makeCallback(eventNode, initialHandler)
 
 		var value = result.a;
 		var message = !tag ? value : tag < 3 ? value.a : value.R;
-		var stopPropagation = tag == 1 ? value.b : tag == 3 && value.bn;
+		var stopPropagation = tag == 1 ? value.b : tag == 3 && value.bp;
 		var currentEventNode = (
 			stopPropagation && event.stopPropagation(),
-			(tag == 2 ? value.b : tag == 3 && value.bk) && event.preventDefault(),
+			(tag == 2 ? value.b : tag == 3 && value.bm) && event.preventDefault(),
 			eventNode
 		);
 		var tagger;
@@ -3942,11 +3942,11 @@ var _Browser_element = _Debugger_element || F4(function(impl, flagDecoder, debug
 	return _Platform_initialize(
 		flagDecoder,
 		args,
-		impl.cw,
-		impl.cJ,
-		impl.cH,
+		impl.cy,
+		impl.cK,
+		impl.cI,
 		function(sendToApp, initialModel) {
-			var view = impl.cL;
+			var view = impl.cM;
 			/**/
 			var domNode = args['node'];
 			//*/
@@ -3978,12 +3978,12 @@ var _Browser_document = _Debugger_document || F4(function(impl, flagDecoder, deb
 	return _Platform_initialize(
 		flagDecoder,
 		args,
-		impl.cw,
-		impl.cJ,
-		impl.cH,
+		impl.cy,
+		impl.cK,
+		impl.cI,
 		function(sendToApp, initialModel) {
-			var divertHrefToApp = impl.bl && impl.bl(sendToApp)
-			var view = impl.cL;
+			var divertHrefToApp = impl.bn && impl.bn(sendToApp)
+			var view = impl.cM;
 			var title = _VirtualDom_doc.title;
 			var bodyNode = _VirtualDom_doc.body;
 			var currNode = _VirtualDom_virtualize(bodyNode);
@@ -3991,12 +3991,12 @@ var _Browser_document = _Debugger_document || F4(function(impl, flagDecoder, deb
 			{
 				_VirtualDom_divertHrefToApp = divertHrefToApp;
 				var doc = view(model);
-				var nextNode = _VirtualDom_node('body')(_List_Nil)(doc.cm);
+				var nextNode = _VirtualDom_node('body')(_List_Nil)(doc.co);
 				var patches = _VirtualDom_diff(currNode, nextNode);
 				bodyNode = _VirtualDom_applyPatches(bodyNode, currNode, patches, sendToApp);
 				currNode = nextNode;
 				_VirtualDom_divertHrefToApp = 0;
-				(title !== doc.cI) && (_VirtualDom_doc.title = title = doc.cI);
+				(title !== doc.cJ) && (_VirtualDom_doc.title = title = doc.cJ);
 			});
 		}
 	);
@@ -4052,12 +4052,12 @@ function _Browser_makeAnimator(model, draw)
 
 function _Browser_application(impl)
 {
-	var onUrlChange = impl.cA;
-	var onUrlRequest = impl.cB;
+	var onUrlChange = impl.cB;
+	var onUrlRequest = impl.cC;
 	var key = function() { key.a(onUrlChange(_Browser_getUrl())); };
 
 	return _Browser_document({
-		bl: function(sendToApp)
+		bn: function(sendToApp)
 		{
 			key.a = sendToApp;
 			_Browser_window.addEventListener('popstate', key);
@@ -4073,9 +4073,9 @@ function _Browser_application(impl)
 					var next = $elm$url$Url$fromString(href).a;
 					sendToApp(onUrlRequest(
 						(next
-							&& curr.b_ === next.b_
-							&& curr.bL === next.bL
-							&& curr.bX.a === next.bX.a
+							&& curr.b0 === next.b0
+							&& curr.bN === next.bN
+							&& curr.bZ.a === next.bZ.a
 						)
 							? $elm$browser$Browser$Internal(next)
 							: $elm$browser$Browser$External(href)
@@ -4083,13 +4083,13 @@ function _Browser_application(impl)
 				}
 			});
 		},
-		cw: function(flags)
+		cy: function(flags)
 		{
-			return A3(impl.cw, flags, _Browser_getUrl(), key);
+			return A3(impl.cy, flags, _Browser_getUrl(), key);
 		},
-		cL: impl.cL,
-		cJ: impl.cJ,
-		cH: impl.cH
+		cM: impl.cM,
+		cK: impl.cK,
+		cI: impl.cI
 	});
 }
 
@@ -4155,17 +4155,17 @@ var _Browser_decodeEvent = F2(function(decoder, event)
 function _Browser_visibilityInfo()
 {
 	return (typeof _VirtualDom_doc.hidden !== 'undefined')
-		? { ct: 'hidden', cn: 'visibilitychange' }
+		? { cv: 'hidden', cp: 'visibilitychange' }
 		:
 	(typeof _VirtualDom_doc.mozHidden !== 'undefined')
-		? { ct: 'mozHidden', cn: 'mozvisibilitychange' }
+		? { cv: 'mozHidden', cp: 'mozvisibilitychange' }
 		:
 	(typeof _VirtualDom_doc.msHidden !== 'undefined')
-		? { ct: 'msHidden', cn: 'msvisibilitychange' }
+		? { cv: 'msHidden', cp: 'msvisibilitychange' }
 		:
 	(typeof _VirtualDom_doc.webkitHidden !== 'undefined')
-		? { ct: 'webkitHidden', cn: 'webkitvisibilitychange' }
-		: { ct: 'hidden', cn: 'visibilitychange' };
+		? { cv: 'webkitHidden', cp: 'webkitvisibilitychange' }
+		: { cv: 'hidden', cp: 'visibilitychange' };
 }
 
 
@@ -4246,12 +4246,12 @@ var _Browser_call = F2(function(functionName, id)
 function _Browser_getViewport()
 {
 	return {
-		b4: _Browser_getScene(),
-		cd: {
-			cg: _Browser_window.pageXOffset,
-			ch: _Browser_window.pageYOffset,
-			ce: _Browser_doc.documentElement.clientWidth,
-			bK: _Browser_doc.documentElement.clientHeight
+		b6: _Browser_getScene(),
+		cf: {
+			ci: _Browser_window.pageXOffset,
+			cj: _Browser_window.pageYOffset,
+			cg: _Browser_doc.documentElement.clientWidth,
+			bM: _Browser_doc.documentElement.clientHeight
 		}
 	};
 }
@@ -4261,8 +4261,8 @@ function _Browser_getScene()
 	var body = _Browser_doc.body;
 	var elem = _Browser_doc.documentElement;
 	return {
-		ce: Math.max(body.scrollWidth, body.offsetWidth, elem.scrollWidth, elem.offsetWidth, elem.clientWidth),
-		bK: Math.max(body.scrollHeight, body.offsetHeight, elem.scrollHeight, elem.offsetHeight, elem.clientHeight)
+		cg: Math.max(body.scrollWidth, body.offsetWidth, elem.scrollWidth, elem.offsetWidth, elem.clientWidth),
+		bM: Math.max(body.scrollHeight, body.offsetHeight, elem.scrollHeight, elem.offsetHeight, elem.clientHeight)
 	};
 }
 
@@ -4285,15 +4285,15 @@ function _Browser_getViewportOf(id)
 	return _Browser_withNode(id, function(node)
 	{
 		return {
-			b4: {
-				ce: node.scrollWidth,
-				bK: node.scrollHeight
+			b6: {
+				cg: node.scrollWidth,
+				bM: node.scrollHeight
 			},
-			cd: {
-				cg: node.scrollLeft,
-				ch: node.scrollTop,
-				ce: node.clientWidth,
-				bK: node.clientHeight
+			cf: {
+				ci: node.scrollLeft,
+				cj: node.scrollTop,
+				cg: node.clientWidth,
+				bM: node.clientHeight
 			}
 		};
 	});
@@ -4323,18 +4323,18 @@ function _Browser_getElement(id)
 		var x = _Browser_window.pageXOffset;
 		var y = _Browser_window.pageYOffset;
 		return {
-			b4: _Browser_getScene(),
-			cd: {
-				cg: x,
-				ch: y,
-				ce: _Browser_doc.documentElement.clientWidth,
-				bK: _Browser_doc.documentElement.clientHeight
+			b6: _Browser_getScene(),
+			cf: {
+				ci: x,
+				cj: y,
+				cg: _Browser_doc.documentElement.clientWidth,
+				bM: _Browser_doc.documentElement.clientHeight
 			},
-			cr: {
-				cg: x + rect.left,
-				ch: y + rect.top,
-				ce: rect.width,
-				bK: rect.height
+			ct: {
+				ci: x + rect.left,
+				cj: y + rect.top,
+				cg: rect.width,
+				bM: rect.height
 			}
 		};
 	});
@@ -4956,7 +4956,7 @@ var $elm$url$Url$Http = 0;
 var $elm$url$Url$Https = 1;
 var $elm$url$Url$Url = F6(
 	function (protocol, host, port_, path, query, fragment) {
-		return {bJ: fragment, bL: host, bV: path, bX: port_, b_: protocol, b$: query};
+		return {bL: fragment, bN: host, bX: path, bZ: port_, b0: protocol, b1: query};
 	});
 var $elm$core$String$contains = _String_contains;
 var $elm$core$String$length = _String_length;
@@ -5375,16 +5375,18 @@ var $author$project$Snake$initialGame = function () {
 	var b = $author$project$Snake$emptyPlane;
 	return {
 		C: b,
-		aY: 1,
+		aH: 1,
 		l: 1,
-		be: 0,
-		at: '',
-		aO: $author$project$Snake$zero,
+		aL: _List_Nil,
+		bg: 0,
+		au: '',
+		a3: '',
+		ad: $author$project$Snake$zero,
 		w: $author$project$Snake$makeSnake(b),
-		a7: $author$project$Snake$minSpeed,
-		b6: 1,
+		aR: $author$project$Snake$minSpeed,
+		b8: 1,
 		s: _List_Nil,
-		af: $author$project$Snake$makeTickSpeed($author$project$Snake$minSpeed)
+		U: $author$project$Snake$makeTickSpeed($author$project$Snake$minSpeed)
 	};
 }();
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
@@ -5440,7 +5442,7 @@ var $elm$time$Time$Every = F2(
 	});
 var $elm$time$Time$State = F2(
 	function (taggers, processes) {
-		return {bZ: processes, b8: taggers};
+		return {b$: processes, ca: taggers};
 	});
 var $elm$core$Dict$RBEmpty_elm_builtin = {$: -2};
 var $elm$core$Dict$empty = $elm$core$Dict$RBEmpty_elm_builtin;
@@ -5732,7 +5734,7 @@ var $elm$time$Time$spawnHelp = F3(
 	});
 var $elm$time$Time$onEffects = F3(
 	function (router, subs, _v0) {
-		var processes = _v0.bZ;
+		var processes = _v0.b$;
 		var rightStep = F3(
 			function (_v6, id, _v7) {
 				var spawns = _v7.a;
@@ -5801,7 +5803,7 @@ var $elm$time$Time$millisToPosix = $elm$core$Basics$identity;
 var $elm$time$Time$now = _Time_now($elm$time$Time$millisToPosix);
 var $elm$time$Time$onSelfMsg = F3(
 	function (router, interval, state) {
-		var _v0 = A2($elm$core$Dict$get, interval, state.b8);
+		var _v0 = A2($elm$core$Dict$get, interval, state.ca);
 		if (_v0.$ === 1) {
 			return $elm$core$Task$succeed(state);
 		} else {
@@ -5854,7 +5856,7 @@ var $elm$browser$Browser$Events$MySub = F3(
 	});
 var $elm$browser$Browser$Events$State = F2(
 	function (subs, pids) {
-		return {bW: pids, b7: subs};
+		return {bY: pids, b9: subs};
 	});
 var $elm$browser$Browser$Events$init = $elm$core$Task$succeed(
 	A2($elm$browser$Browser$Events$State, _List_Nil, $elm$core$Dict$empty));
@@ -5888,7 +5890,7 @@ var $elm$core$Dict$fromList = function (assocs) {
 };
 var $elm$browser$Browser$Events$Event = F2(
 	function (key, event) {
-		return {bG: event, bQ: key};
+		return {bI: event, bS: key};
 	});
 var $elm$browser$Browser$Events$spawn = F3(
 	function (router, key, _v0) {
@@ -5962,7 +5964,7 @@ var $elm$browser$Browser$Events$onEffects = F3(
 			stepLeft,
 			stepBoth,
 			stepRight,
-			state.bW,
+			state.bY,
 			$elm$core$Dict$fromList(newSubs),
 			_Utils_Tuple3(_List_Nil, $elm$core$Dict$empty, _List_Nil));
 		var deadPids = _v0.a;
@@ -6008,8 +6010,8 @@ var $elm$core$List$filterMap = F2(
 	});
 var $elm$browser$Browser$Events$onSelfMsg = F3(
 	function (router, _v0, state) {
-		var key = _v0.bQ;
-		var event = _v0.bG;
+		var key = _v0.bS;
+		var event = _v0.bI;
 		var toMessage = function (_v2) {
 			var subKey = _v2.a;
 			var _v3 = _v2.b;
@@ -6018,7 +6020,7 @@ var $elm$browser$Browser$Events$onSelfMsg = F3(
 			var decoder = _v3.c;
 			return _Utils_eq(subKey, key) ? A2(_Browser_decodeEvent, decoder, event) : $elm$core$Maybe$Nothing;
 		};
-		var messages = A2($elm$core$List$filterMap, toMessage, state.b7);
+		var messages = A2($elm$core$List$filterMap, toMessage, state.b9);
 		return A2(
 			$elm$core$Task$andThen,
 			function (_v1) {
@@ -6050,14 +6052,14 @@ var $elm$browser$Browser$Events$on = F3(
 	});
 var $elm$browser$Browser$Events$onKeyDown = A2($elm$browser$Browser$Events$on, 0, 'keydown');
 var $author$project$Snake$subscriptions = function (model) {
-	var _v0 = model.b6;
+	var _v0 = model.b8;
 	if (!_v0) {
 		return $elm$core$Platform$Sub$batch(
 			_List_fromArray(
 				[
 					A2(
 					$elm$time$Time$every,
-					model.af,
+					model.U,
 					$elm$core$Basics$always($author$project$Snake$Tick)),
 					$elm$browser$Browser$Events$onKeyDown(
 					$author$project$Snake$decodeDirection(model)),
@@ -6147,7 +6149,7 @@ var $author$project$GuessANumber$LB = $elm$core$Basics$identity;
 var $author$project$GuessANumber$Stopped = {$: 2};
 var $author$project$GuessANumber$Try = $elm$core$Basics$identity;
 var $author$project$GuessANumber$UB = $elm$core$Basics$identity;
-var $author$project$GuessANumber$initialModel = {bC: 0, bf: 0, b6: $author$project$GuessANumber$Stopped, cc: 100};
+var $author$project$GuessANumber$initialModel = {bE: 0, bh: 0, b8: $author$project$GuessANumber$Stopped, ce: 100};
 var $author$project$GuessANumber$init = _Utils_Tuple2($author$project$GuessANumber$initialModel, $elm$core$Platform$Cmd$none);
 var $author$project$Minesweeper$Stopped = 3;
 var $author$project$Minesweeper$Cell = F2(
@@ -6186,9 +6188,9 @@ var $author$project$Minesweeper$init = _Utils_Tuple2(
 		k: A3($author$project$Wrapped$wrapLift2, $author$project$Minesweeper$emptyBoard, 10, 10),
 		G: $author$project$Wrapped$wrap(10),
 		I: $author$project$Wrapped$wrap(10),
-		bU: $author$project$Wrapped$wrap(10),
+		bW: $author$project$Wrapped$wrap(10),
 		J: $author$project$Wrapped$wrap(10),
-		b6: 3
+		b8: 3
 	},
 	$elm$core$Platform$Cmd$none);
 var $author$project$TicTacToe$Stopped = {$: 5};
@@ -6196,8 +6198,8 @@ var $author$project$TicTacToe$Computer = 1;
 var $author$project$TicTacToe$GameOptions = $elm$core$Basics$identity;
 var $author$project$TicTacToe$Human = 0;
 var $author$project$TicTacToe$defaultOptions = _Utils_Tuple2(
-	{aG: 0, aP: 'X'},
-	{aG: 1, aP: 'O'});
+	{aI: 0, aS: 'X'},
+	{aI: 1, aS: 'O'});
 var $author$project$TicTacToe$Board = $elm$core$Basics$identity;
 var $author$project$TicTacToe$EmptyCell = {$: 1};
 var $author$project$TicTacToe$emptyBoard = A2(
@@ -6205,7 +6207,7 @@ var $author$project$TicTacToe$emptyBoard = A2(
 	9,
 	$elm$core$Basics$always($author$project$TicTacToe$EmptyCell));
 var $author$project$TicTacToe$init = _Utils_Tuple2(
-	{C: $author$project$TicTacToe$emptyBoard, bH: false, _: $author$project$TicTacToe$defaultOptions, x: $author$project$TicTacToe$Stopped},
+	{C: $author$project$TicTacToe$emptyBoard, bJ: false, aa: $author$project$TicTacToe$defaultOptions, x: $author$project$TicTacToe$Stopped},
 	$elm$core$Platform$Cmd$none);
 var $elm$core$Tuple$mapBoth = F3(
 	function (funcA, funcB, _v0) {
@@ -6276,7 +6278,7 @@ var $author$project$GuessANumber$update = F2(
 				return _Utils_Tuple2(
 					_Utils_update(
 						mdl,
-						{bf: l}),
+						{bh: l}),
 					$elm$core$Platform$Cmd$none);
 			case 0:
 				var n = msg.a;
@@ -7301,7 +7303,7 @@ var $author$project$Minesweeper$playAt = F3(
 			var status = A2($author$project$Minesweeper$getStatus, c, nCells);
 			return _Utils_update(
 				model,
-				{k: nCells, b6: status});
+				{k: nCells, b8: status});
 		}
 	});
 var $author$project$Minesweeper$Marked = 2;
@@ -7369,7 +7371,7 @@ var $author$project$Minesweeper$revealAdjacent = F3(
 						function (_v3, acc) {
 							var x1 = _v3.a;
 							var y1 = _v3.b;
-							return (!acc.b6) ? A3($author$project$Minesweeper$playAt, acc, x1, y1) : acc;
+							return (!acc.b8) ? A3($author$project$Minesweeper$playAt, acc, x1, y1) : acc;
 						}),
 					model,
 					l);
@@ -7446,7 +7448,7 @@ var $author$project$Minesweeper$update = F2(
 									},
 									model,
 									array),
-								b6: 0
+								b8: 0
 							}),
 						x,
 						y),
@@ -7542,7 +7544,7 @@ var $author$project$Minesweeper$update = F2(
 							u: model.I,
 							o: model.J,
 							k: A2($author$project$Minesweeper$emptyBoard, model.J, model.I),
-							b6: 3
+							b8: 3
 						}),
 					$elm$core$Platform$Cmd$none);
 			case 8:
@@ -7634,6 +7636,10 @@ var $author$project$Snake$addTarget = F3(
 		var coord = $author$project$Plane$fromPoint(pos).a;
 		return ((!$author$project$Plane$at(pos)) || (A2($author$project$Snake$isSnake, coord, model.w) || A2($author$project$Snake$isTarget, coord, model.s))) ? model.s : A2($elm$core$List$cons, pos, model.s);
 	});
+var $author$project$Snake$fromScore = function (_v0) {
+	var s = _v0;
+	return s;
+};
 var $author$project$Snake$TargetPositionGenerated = function (a) {
 	return {$: 5, a: a};
 };
@@ -7781,10 +7787,6 @@ var $elm$core$List$filter = F2(
 			_List_Nil,
 			list);
 	});
-var $author$project$Snake$fromScore = function (_v0) {
-	var s = _v0;
-	return s;
-};
 var $author$project$Snake$headNE = function (_v0) {
 	var a = _v0.a;
 	return a;
@@ -7922,7 +7924,7 @@ var $author$project$Snake$moveSnake = function (model) {
 		return _Utils_Tuple2(
 			_Utils_update(
 				model,
-				{b6: 2}),
+				{b8: 2}),
 			$elm$core$Platform$Cmd$none);
 	} else {
 		if (A2($author$project$Snake$isTarget, coord, model.s)) {
@@ -7930,10 +7932,10 @@ var $author$project$Snake$moveSnake = function (model) {
 				_Utils_update(
 					model,
 					{
-						aO: $author$project$Snake$fromScore(model.aO) + (501 - $elm$core$Basics$floor(model.af)),
+						ad: $author$project$Snake$fromScore(model.ad) + (501 - $elm$core$Basics$floor(model.U)),
 						w: A2($author$project$Snake$consNE, nextCell, model.w),
 						s: removeTarget(coord),
-						af: model.af * 0.95
+						U: model.U * 0.95
 					}),
 				$elm$core$Platform$Cmd$none);
 		} else {
@@ -7954,8 +7956,17 @@ var $author$project$Snake$restart = function (model) {
 	var s = $author$project$Snake$makeSnake(model.C);
 	return _Utils_update(
 		model,
-		{l: 1, w: s, b6: 0, s: _List_Nil});
+		{
+			aH: 1,
+			l: 1,
+			ad: $author$project$Snake$zero,
+			w: s,
+			b8: 0,
+			s: _List_Nil,
+			U: $author$project$Snake$makeTickSpeed(model.aR)
+		});
 };
+var $elm$core$List$sortBy = _List_sortBy;
 var $author$project$Snake$validLevelFrom = F3(
 	function (m, i, l) {
 		if (l.$ === 1) {
@@ -7963,14 +7974,17 @@ var $author$project$Snake$validLevelFrom = F3(
 			return _Utils_Tuple2(
 				_Utils_update(
 					m,
-					{C: $author$project$Snake$emptyPlane, at: s}),
+					{
+						C: $author$project$Snake$emptyPlane,
+						au: s + ('(level ' + ($elm$core$String$fromInt(i) + ')'))
+					}),
 				$elm$core$Platform$Cmd$none);
 		} else {
 			var lv = l.a;
 			return _Utils_Tuple2(
 				_Utils_update(
 					m,
-					{C: lv, at: ''}),
+					{C: lv, au: ''}),
 				$elm$core$Platform$Cmd$none);
 		}
 	});
@@ -7981,13 +7995,13 @@ var $author$project$Snake$update = F2(
 				return $author$project$Snake$moveSnake(
 					_Utils_update(
 						model,
-						{l: model.aY}));
+						{l: model.aH}));
 			case 2:
 				var d = msg.a;
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{aY: d}),
+						{aH: d}),
 					$elm$core$Platform$Cmd$none);
 			case 3:
 				var s = msg.a;
@@ -7995,8 +8009,8 @@ var $author$project$Snake$update = F2(
 					_Utils_update(
 						model,
 						{
-							a7: s,
-							af: $author$project$Snake$makeTickSpeed(s)
+							aR: s,
+							U: $author$project$Snake$makeTickSpeed(s)
 						}),
 					$elm$core$Platform$Cmd$none);
 			case 4:
@@ -8022,11 +8036,29 @@ var $author$project$Snake$update = F2(
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{b6: 1}),
+						{b8: 1}),
+					$elm$core$Platform$Cmd$none);
+			case 8:
+				var scores = A2(
+					$elm$core$List$sortBy,
+					A2(
+						$elm$core$Basics$composeR,
+						$elm$core$Tuple$first,
+						A2($elm$core$Basics$composeR, $author$project$Snake$fromScore, $elm$core$Basics$negate)),
+					function (s) {
+						return A2(
+							$elm$core$List$cons,
+							_Utils_Tuple2(model.ad, model.a3),
+							s);
+					}(model.aL));
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{aL: scores, b8: 1}),
 					$elm$core$Platform$Cmd$none);
 			case 1:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-			default:
+			case 9:
 				var i = msg.a;
 				var _v2 = A2($elm_community$list_extra$List$Extra$getAt, i, $author$project$Snake$levels);
 				if (_v2.$ === 1) {
@@ -8034,13 +8066,20 @@ var $author$project$Snake$update = F2(
 						_Utils_update(
 							model,
 							{
-								at: 'Invalid i received: ' + $elm$core$String$fromInt(i)
+								au: 'Invalid i received: ' + $elm$core$String$fromInt(i)
 							}),
 						$elm$core$Platform$Cmd$none);
 				} else {
 					var level = _v2.a;
 					return A3($author$project$Snake$validLevelFrom, model, i, level);
 				}
+			default:
+				var n = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{a3: n}),
+					$elm$core$Platform$Cmd$none);
 		}
 	});
 var $author$project$Main$updateSK = A3($author$project$Main$mapUpdate, $author$project$Snake$update, $author$project$Main$SnakeMsg, $author$project$Main$Snake);
@@ -8343,7 +8382,7 @@ var $author$project$TicTacToe$dispatchOnPlayer = F3(
 var $author$project$TicTacToe$isControlledBy = function (ctrl) {
 	return $author$project$TicTacToe$dispatchOnPlayer(
 		function (c) {
-			return _Utils_eq(c.aG, ctrl);
+			return _Utils_eq(c.aI, ctrl);
 		});
 };
 var $author$project$TicTacToe$getMove = F3(
@@ -8371,7 +8410,7 @@ var $author$project$TicTacToe$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
 			case 1:
-				var _v1 = A3($author$project$TicTacToe$getMove, model._, $author$project$TicTacToe$emptyBoard, $author$project$TicTacToe$player1);
+				var _v1 = A3($author$project$TicTacToe$getMove, model.aa, $author$project$TicTacToe$emptyBoard, $author$project$TicTacToe$player1);
 				var state = _v1.a;
 				var cmd = _v1.b;
 				return _Utils_Tuple2(
@@ -8393,7 +8432,7 @@ var $author$project$TicTacToe$update = F2(
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{_: options}),
+						{aa: options}),
 					$elm$core$Platform$Cmd$none);
 			default:
 				var pos = msg.a;
@@ -8424,7 +8463,7 @@ var $author$project$TicTacToe$update = F2(
 						} else {
 							var positions = _v3.a;
 							var next = $author$project$TicTacToe$nextPlayer(player);
-							var _v4 = $elm$core$List$isEmpty(positions) ? _Utils_Tuple2($author$project$TicTacToe$Draw, $elm$core$Platform$Cmd$none) : A3($author$project$TicTacToe$getMove, model._, board, next);
+							var _v4 = $elm$core$List$isEmpty(positions) ? _Utils_Tuple2($author$project$TicTacToe$Draw, $elm$core$Platform$Cmd$none) : A3($author$project$TicTacToe$getMove, model.aa, board, next);
 							var state = _v4.a;
 							var cmd = _v4.b;
 							return _Utils_Tuple2(
@@ -8607,7 +8646,7 @@ var $author$project$GuessANumber$view = function (model) {
 };
 var $author$project$Minesweeper$Restart = {$: 2};
 var $rtfeldman$elm_css$Css$Structure$Compatible = 0;
-var $rtfeldman$elm_css$Css$auto = {cj: 0, a: 0, am: 0, a$: 0, cx: 0, aq: 0, Q: 0, F: 0, au: 0, A: 0, a8: 0, az: 0, t: 0, K: 'auto'};
+var $rtfeldman$elm_css$Css$auto = {cl: 0, a: 0, an: 0, a1: 0, cz: 0, ar: 0, Q: 0, F: 0, av: 0, A: 0, ba: 0, aA: 0, t: 0, K: 'auto'};
 var $rtfeldman$elm_css$Html$Styled$button = $rtfeldman$elm_css$Html$Styled$node('button');
 var $rtfeldman$elm_css$Css$Structure$UniversalSelectorSequence = function (a) {
 	return {$: 1, a: a};
@@ -8655,8 +8694,8 @@ var $rtfeldman$elm_css$Css$Structure$compactHelp = F2(
 					A2($elm$core$List$cons, declaration, declarations));
 			case 6:
 				var record = declaration.a;
-				return $elm$core$String$isEmpty(record.co) ? _Utils_Tuple2(keyframesByName, declarations) : _Utils_Tuple2(
-					A3($elm$core$Dict$insert, record.cz, record.co, keyframesByName),
+				return $elm$core$String$isEmpty(record.cq) ? _Utils_Tuple2(keyframesByName, declarations) : _Utils_Tuple2(
+					A3($elm$core$Dict$insert, record.a3, record.cq, keyframesByName),
 					declarations);
 			case 7:
 				var properties = declaration.a;
@@ -8702,16 +8741,16 @@ var $rtfeldman$elm_css$Css$Structure$withKeyframeDeclarations = F2(
 					var name = _v0.a;
 					var decl = _v0.b;
 					return $rtfeldman$elm_css$Css$Structure$Keyframes(
-						{co: decl, cz: name});
+						{cq: decl, a3: name});
 				},
 				$elm$core$Dict$toList(keyframesByName)),
 			compactedDeclarations);
 	});
 var $rtfeldman$elm_css$Css$Structure$compactStylesheet = function (_v0) {
-	var charset = _v0.bB;
-	var imports = _v0.bM;
-	var namespaces = _v0.bS;
-	var declarations = _v0.cp;
+	var charset = _v0.bD;
+	var imports = _v0.bO;
+	var namespaces = _v0.bU;
+	var declarations = _v0.cr;
 	var _v1 = A3(
 		$elm$core$List$foldr,
 		$rtfeldman$elm_css$Css$Structure$compactHelp,
@@ -8720,7 +8759,7 @@ var $rtfeldman$elm_css$Css$Structure$compactStylesheet = function (_v0) {
 	var keyframesByName = _v1.a;
 	var compactedDeclarations = _v1.b;
 	var finalDeclarations = A2($rtfeldman$elm_css$Css$Structure$withKeyframeDeclarations, keyframesByName, compactedDeclarations);
-	return {bB: charset, cp: finalDeclarations, bM: imports, bS: namespaces};
+	return {bD: charset, cr: finalDeclarations, bO: imports, bU: namespaces};
 };
 var $rtfeldman$elm_css$Css$Structure$Output$charsetToString = function (charset) {
 	return A2(
@@ -8734,7 +8773,7 @@ var $rtfeldman$elm_css$Css$Structure$Output$charsetToString = function (charset)
 			charset));
 };
 var $rtfeldman$elm_css$Css$Structure$Output$mediaExpressionToString = function (expression) {
-	return '(' + (expression.bI + (A2(
+	return '(' + (expression.bK + (A2(
 		$elm$core$Maybe$withDefault,
 		'',
 		A2(
@@ -8982,8 +9021,8 @@ var $rtfeldman$elm_css$Css$Structure$Output$prettyPrintDeclaration = function (d
 		case 5:
 			return 'TODO';
 		case 6:
-			var name = decl.a.cz;
-			var declaration = decl.a.co;
+			var name = decl.a.a3;
+			var declaration = decl.a.cq;
 			return '@keyframes ' + (name + (' {\n' + (declaration + '\n}')));
 		case 7:
 			return 'TODO';
@@ -8994,10 +9033,10 @@ var $rtfeldman$elm_css$Css$Structure$Output$prettyPrintDeclaration = function (d
 	}
 };
 var $rtfeldman$elm_css$Css$Structure$Output$prettyPrint = function (_v0) {
-	var charset = _v0.bB;
-	var imports = _v0.bM;
-	var namespaces = _v0.bS;
-	var declarations = _v0.cp;
+	var charset = _v0.bD;
+	var imports = _v0.bO;
+	var namespaces = _v0.bU;
+	var declarations = _v0.cr;
 	return A2(
 		$elm$core$String$join,
 		'\n\n',
@@ -9413,7 +9452,7 @@ var $rtfeldman$elm_css$Css$Structure$concatMapLastStyleBlock = F2(
 var $elm$core$String$cons = _String_cons;
 var $Skinney$murmur3$Murmur3$HashData = F4(
 	function (shift, seed, hash, charsProcessed) {
-		return {aj: charsProcessed, ap: hash, ac: seed, av: shift};
+		return {ak: charsProcessed, aq: hash, ae: seed, aw: shift};
 	});
 var $Skinney$murmur3$Murmur3$c1 = 3432918353;
 var $Skinney$murmur3$Murmur3$c2 = 461845907;
@@ -9427,14 +9466,14 @@ var $Skinney$murmur3$Murmur3$rotlBy = F2(
 		return (a << b) | (a >>> (32 - b));
 	});
 var $Skinney$murmur3$Murmur3$finalize = function (data) {
-	var acc = (!(!data.ap)) ? (data.ac ^ A2(
+	var acc = (!(!data.aq)) ? (data.ae ^ A2(
 		$Skinney$murmur3$Murmur3$multiplyBy,
 		$Skinney$murmur3$Murmur3$c2,
 		A2(
 			$Skinney$murmur3$Murmur3$rotlBy,
 			15,
-			A2($Skinney$murmur3$Murmur3$multiplyBy, $Skinney$murmur3$Murmur3$c1, data.ap)))) : data.ac;
-	var h0 = acc ^ data.aj;
+			A2($Skinney$murmur3$Murmur3$multiplyBy, $Skinney$murmur3$Murmur3$c1, data.aq)))) : data.ae;
+	var h0 = acc ^ data.ak;
 	var h1 = A2($Skinney$murmur3$Murmur3$multiplyBy, 2246822507, h0 ^ (h0 >>> 16));
 	var h2 = A2($Skinney$murmur3$Murmur3$multiplyBy, 3266489909, h1 ^ (h1 >>> 13));
 	return (h2 ^ (h2 >>> 16)) >>> 0;
@@ -9458,17 +9497,17 @@ var $Skinney$murmur3$Murmur3$mix = F2(
 	});
 var $Skinney$murmur3$Murmur3$hashFold = F2(
 	function (c, data) {
-		var res = data.ap | ((255 & $elm$core$Char$toCode(c)) << data.av);
-		var _v0 = data.av;
+		var res = data.aq | ((255 & $elm$core$Char$toCode(c)) << data.aw);
+		var _v0 = data.aw;
 		if (_v0 === 24) {
 			return {
-				aj: data.aj + 1,
-				ap: 0,
-				ac: A2($Skinney$murmur3$Murmur3$mix, data.ac, res),
-				av: 0
+				ak: data.ak + 1,
+				aq: 0,
+				ae: A2($Skinney$murmur3$Murmur3$mix, data.ae, res),
+				aw: 0
 			};
 		} else {
-			return {aj: data.aj + 1, ap: res, ac: data.ac, av: data.av + 8};
+			return {ak: data.ak + 1, aq: res, ae: data.ae, aw: data.aw + 8};
 		}
 	});
 var $Skinney$murmur3$Murmur3$hashString = F2(
@@ -10065,7 +10104,7 @@ var $rtfeldman$elm_css$Css$Preprocess$Resolve$applyStyles = F2(
 						_List_fromArray(
 							[
 								$rtfeldman$elm_css$Css$Structure$Keyframes(
-								{co: str, cz: name})
+								{cq: str, a3: name})
 							]));
 				case 4:
 					var _v12 = styles.a;
@@ -10200,13 +10239,13 @@ var $rtfeldman$elm_css$Css$Preprocess$Resolve$toDeclarations = function (snippet
 	}
 };
 var $rtfeldman$elm_css$Css$Preprocess$Resolve$toStructure = function (_v0) {
-	var charset = _v0.bB;
-	var imports = _v0.bM;
-	var namespaces = _v0.bS;
-	var snippets = _v0.b5;
+	var charset = _v0.bD;
+	var imports = _v0.bO;
+	var namespaces = _v0.bU;
+	var snippets = _v0.b7;
 	var declarations = $rtfeldman$elm_css$Css$Preprocess$Resolve$extract(
 		A2($elm$core$List$concatMap, $rtfeldman$elm_css$Css$Preprocess$unwrapSnippet, snippets));
-	return {bB: charset, cp: declarations, bM: imports, bS: namespaces};
+	return {bD: charset, cr: declarations, bO: imports, bU: namespaces};
 };
 var $rtfeldman$elm_css$Css$Preprocess$Resolve$compileHelp = function (sheet) {
 	return $rtfeldman$elm_css$Css$Structure$Output$prettyPrint(
@@ -10238,7 +10277,7 @@ var $rtfeldman$elm_css$VirtualDom$Styled$makeSnippet = F2(
 	});
 var $rtfeldman$elm_css$VirtualDom$Styled$murmurSeed = 15739;
 var $rtfeldman$elm_css$Css$Preprocess$stylesheet = function (snippets) {
-	return {bB: $elm$core$Maybe$Nothing, bM: _List_Nil, bS: _List_Nil, b5: snippets};
+	return {bD: $elm$core$Maybe$Nothing, bO: _List_Nil, bU: _List_Nil, b7: snippets};
 };
 var $rtfeldman$elm_css$VirtualDom$Styled$getClassname = function (styles) {
 	return $elm$core$List$isEmpty(styles) ? 'unstyled' : A2(
@@ -10287,22 +10326,22 @@ var $elm$core$String$fromFloat = _String_fromNumber;
 var $rtfeldman$elm_css$Css$Internal$lengthConverter = F3(
 	function (units, unitLabel, numericValue) {
 		return {
-			bq: 0,
-			bz: 0,
-			am: 0,
+			bs: 0,
+			bB: 0,
+			an: 0,
 			m: 0,
-			aJ: 0,
-			aq: 0,
-			Q: 0,
+			aM: 0,
 			ar: 0,
+			Q: 0,
 			as: 0,
-			Y: 0,
+			at: 0,
 			Z: 0,
+			_: 0,
 			F: 0,
 			S: numericValue,
-			ay: 0,
-			aA: unitLabel,
-			aU: units,
+			az: 0,
+			aB: unitLabel,
+			aX: units,
 			K: _Utils_ap(
 				$elm$core$String$fromFloat(numericValue),
 				unitLabel)
@@ -10310,7 +10349,7 @@ var $rtfeldman$elm_css$Css$Internal$lengthConverter = F3(
 	});
 var $rtfeldman$elm_css$Css$em = A2($rtfeldman$elm_css$Css$Internal$lengthConverter, 0, 'em');
 var $rtfeldman$elm_css$Html$Styled$fieldset = $rtfeldman$elm_css$Html$Styled$node('fieldset');
-var $rtfeldman$elm_css$Css$fillAvailable = {ar: 0, Y: 0, cy: 0, K: 'fill-available'};
+var $rtfeldman$elm_css$Css$fillAvailable = {as: 0, Z: 0, cA: 0, K: 'fill-available'};
 var $rtfeldman$elm_css$Css$fitContent = _Utils_update(
 	$rtfeldman$elm_css$Css$fillAvailable,
 	{K: 'fit-content'});
@@ -10450,7 +10489,7 @@ var $author$project$Minesweeper$heightInput = A2(
 		return $.I;
 	},
 	$author$project$Minesweeper$HeightChanged);
-var $rtfeldman$elm_css$Css$hidden = {p: 0, au: 0, K: 'hidden', aV: 0};
+var $rtfeldman$elm_css$Css$hidden = {p: 0, av: 0, K: 'hidden', aY: 0};
 var $rtfeldman$elm_css$Css$Preprocess$ApplyStyles = function (a) {
 	return {$: 6, a: a};
 };
@@ -10603,7 +10642,7 @@ var $author$project$Minesweeper$noTextSelectionStyle = $rtfeldman$elm_css$Css$ba
 				_Utils_Tuple2('-ms-user-select', 'none'),
 				_Utils_Tuple2('-user-select', 'none')
 			])));
-var $rtfeldman$elm_css$Css$solid = {p: 0, ad: 0, K: 'solid'};
+var $rtfeldman$elm_css$Css$solid = {p: 0, af: 0, K: 'solid'};
 var $author$project$Minesweeper$Flagged = F2(
 	function (a, b) {
 		return {$: 1, a: a, b: b};
@@ -10627,11 +10666,11 @@ var $rtfeldman$elm_css$Css$cssFunction = F2(
 var $rtfeldman$elm_css$Css$rgb = F3(
 	function (r, g, b) {
 		return {
-			aD: 1,
-			aF: b,
+			aE: 1,
+			aG: b,
 			D: 0,
-			aI: g,
-			aN: r,
+			aK: g,
+			aQ: r,
 			K: A2(
 				$rtfeldman$elm_css$Css$cssFunction,
 				'rgb',
@@ -10692,7 +10731,7 @@ var $rtfeldman$elm_css$Css$prop3 = F4(
 var $rtfeldman$elm_css$Css$border3 = $rtfeldman$elm_css$Css$prop3('border');
 var $author$project$Minesweeper$cellSize = $rtfeldman$elm_css$Css$em(1);
 var $rtfeldman$elm_css$Css$center = $rtfeldman$elm_css$Css$prop1('center');
-var $rtfeldman$elm_css$Css$ellipsis = {b9: 0, K: 'ellipsis'};
+var $rtfeldman$elm_css$Css$ellipsis = {cb: 0, K: 'ellipsis'};
 var $rtfeldman$elm_css$Css$height = $rtfeldman$elm_css$Css$prop1('height');
 var $rtfeldman$elm_css$Css$overflow = $rtfeldman$elm_css$Css$prop1('overflow');
 var $rtfeldman$elm_css$Css$textAlign = function (fn) {
@@ -10765,11 +10804,11 @@ var $author$project$Minesweeper$viewCell = F4(
 	function (model, x, y, _v0) {
 		var cont = _v0.a;
 		var visi = _v0.b;
-		var mistake = (visi === 2) && ((model.b6 === 2) && (!cont));
+		var mistake = (visi === 2) && ((model.b8 === 2) && (!cont));
 		var bgColor = function () {
 			switch (visi) {
 				case 0:
-					return ((cont === 1) && (model.b6 === 2)) ? $author$project$Minesweeper$mineColor : $author$project$Minesweeper$hiddenCellColor;
+					return ((cont === 1) && (model.b8 === 2)) ? $author$project$Minesweeper$mineColor : $author$project$Minesweeper$hiddenCellColor;
 				case 1:
 					return $author$project$Minesweeper$flaggedCellColor;
 				case 2:
@@ -10779,7 +10818,7 @@ var $author$project$Minesweeper$viewCell = F4(
 			}
 		}();
 		var actions = function () {
-			var _v2 = model.b6;
+			var _v2 = model.b8;
 			switch (_v2) {
 				case 0:
 					var style = (visi === 3) ? _List_fromArray(
@@ -10962,7 +11001,7 @@ var $author$project$Minesweeper$viewBoard = function (model) {
 			A2(loop, cellList, _List_Nil)));
 };
 var $rtfeldman$elm_css$Css$visibility = $rtfeldman$elm_css$Css$prop1('visibility');
-var $rtfeldman$elm_css$Css$visible = {au: 0, A: 0, K: 'visible', aV: 0};
+var $rtfeldman$elm_css$Css$visible = {av: 0, A: 0, K: 'visible', aY: 0};
 var $author$project$Minesweeper$WidthChanged = function (a) {
 	return {$: 6, a: a};
 };
@@ -10973,7 +11012,7 @@ var $author$project$Minesweeper$widthInput = A2(
 	},
 	$author$project$Minesweeper$WidthChanged);
 var $author$project$Minesweeper$view = function (model) {
-	var visi = (!model.b6) ? $rtfeldman$elm_css$Css$visibility($rtfeldman$elm_css$Css$hidden) : $rtfeldman$elm_css$Css$visibility($rtfeldman$elm_css$Css$visible);
+	var visi = (!model.b8) ? $rtfeldman$elm_css$Css$visibility($rtfeldman$elm_css$Css$hidden) : $rtfeldman$elm_css$Css$visibility($rtfeldman$elm_css$Css$visible);
 	var optionStyle = _List_fromArray(
 		[
 			$rtfeldman$elm_css$Css$margin(
@@ -11140,9 +11179,13 @@ var $author$project$Minesweeper$view = function (model) {
 							$rtfeldman$elm_css$Html$Styled$text('Restart')
 						])),
 					$rtfeldman$elm_css$Html$Styled$text(
-					$author$project$Minesweeper$statusString(model.b6)),
+					$author$project$Minesweeper$statusString(model.b8)),
 					$author$project$Minesweeper$viewBoard(model)
 				])));
+};
+var $author$project$Snake$Died = {$: 8};
+var $author$project$Snake$NameChanged = function (a) {
+	return {$: 10, a: a};
 };
 var $author$project$Snake$Restart = {$: 7};
 var $author$project$Snake$Stop = {$: 6};
@@ -11185,7 +11228,7 @@ var $author$project$Plane$mapRows = F2(
 		return A3(loop, 0, b, _List_Nil);
 	});
 var $author$project$Snake$SetLevel = function (a) {
-	return {$: 8, a: a};
+	return {$: 9, a: a};
 };
 var $rtfeldman$elm_css$Html$Styled$option = $rtfeldman$elm_css$Html$Styled$node('option');
 var $rtfeldman$elm_css$Html$Styled$select = $rtfeldman$elm_css$Html$Styled$node('select');
@@ -11251,7 +11294,7 @@ var $author$project$Snake$levelSelection = function (model) {
 								$rtfeldman$elm_css$Html$Styled$Attributes$value(
 								$elm$core$String$fromInt(i)),
 								$rtfeldman$elm_css$Html$Styled$Attributes$selected(
-								_Utils_eq(model.be, i))
+								_Utils_eq(model.bg, i))
 							]),
 						_List_fromArray(
 							[
@@ -11276,7 +11319,7 @@ var $author$project$Snake$stringToSpeed = function (string) {
 var $author$project$Snake$speedInput = function (model) {
 	return A3(
 		$author$project$CustomElements$number,
-		$author$project$Snake$fromSpeed(model.a7),
+		$author$project$Snake$fromSpeed(model.aR),
 		_List_fromArray(
 			[
 				$rtfeldman$elm_css$Html$Styled$Attributes$max(
@@ -11315,7 +11358,7 @@ var $author$project$Snake$viewOptions = function (model) {
 				_List_fromArray(
 					[
 						$author$project$Snake$levelSelection(model),
-						$rtfeldman$elm_css$Html$Styled$text(model.at)
+						$rtfeldman$elm_css$Html$Styled$text(model.au)
 					]))
 			]));
 };
@@ -11455,6 +11498,90 @@ var $author$project$Snake$viewRow = F2(
 					$author$project$Snake$viewCell(model),
 					array)));
 	});
+var $rtfeldman$elm_css$Html$Styled$li = $rtfeldman$elm_css$Html$Styled$node('li');
+var $rtfeldman$elm_css$Css$listStyle = $rtfeldman$elm_css$Css$prop1('list-style');
+var $rtfeldman$elm_css$Css$none = {ai: 0, bz: 0, p: 0, a: 0, f: 0, cw: 0, bQ: 0, bf: 0, at: 0, Z: 0, F: 0, c: 0, b: 0, bj: 0, a6: 0, cE: 0, A: 0, a7: 0, cG: 0, ay: 0, ag: 0, t: 0, e: 0, cL: 0, K: 'none'};
+var $rtfeldman$elm_css$Css$padding = $rtfeldman$elm_css$Css$prop1('padding');
+var $rtfeldman$elm_css$Html$Styled$ul = $rtfeldman$elm_css$Html$Styled$node('ul');
+var $author$project$Snake$viewScores = function (model) {
+	var showScore = function (_v1) {
+		var s = _v1.a;
+		var n = _v1.b;
+		return A2(
+			$rtfeldman$elm_css$Html$Styled$li,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$Attributes$css(
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Css$displayFlex,
+							$rtfeldman$elm_css$Css$justifyContent($rtfeldman$elm_css$Css$spaceBetween)
+						]))
+				]),
+			_List_fromArray(
+				[
+					A2(
+					$rtfeldman$elm_css$Html$Styled$div,
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Html$Styled$Attributes$css(
+							_List_fromArray(
+								[
+									$rtfeldman$elm_css$Css$maxWidth(
+									$rtfeldman$elm_css$Css$pct(50))
+								]))
+						]),
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Html$Styled$text(n)
+						])),
+					A2(
+					$rtfeldman$elm_css$Html$Styled$div,
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Html$Styled$Attributes$css(
+							_List_fromArray(
+								[
+									$rtfeldman$elm_css$Css$maxWidth(
+									$rtfeldman$elm_css$Css$pct(50))
+								]))
+						]),
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Html$Styled$text(
+							$elm$core$String$fromInt(
+								$author$project$Snake$fromScore(s)))
+						]))
+				]));
+	};
+	var scores = function () {
+		var _v0 = model.aL;
+		if (!_v0.b) {
+			return _List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$text('No scores yet')
+				]);
+		} else {
+			var l = _v0;
+			return A2($elm$core$List$map, showScore, l);
+		}
+	}();
+	return A2(
+		$rtfeldman$elm_css$Html$Styled$ul,
+		_List_fromArray(
+			[
+				$rtfeldman$elm_css$Html$Styled$Attributes$css(
+				_List_fromArray(
+					[
+						$rtfeldman$elm_css$Css$maxWidth(
+						$rtfeldman$elm_css$Css$pct(100)),
+						$rtfeldman$elm_css$Css$listStyle($rtfeldman$elm_css$Css$none),
+						$rtfeldman$elm_css$Css$padding(
+						$rtfeldman$elm_css$Css$px(0))
+					]))
+			]),
+		scores);
+};
 var $author$project$Snake$view = function (model) {
 	var stoppedView = _List_fromArray(
 		[
@@ -11468,56 +11595,89 @@ var $author$project$Snake$view = function (model) {
 			_List_fromArray(
 				[
 					$rtfeldman$elm_css$Html$Styled$text('Start')
-				]))
+				])),
+			$author$project$Snake$viewScores(model)
 		]);
-	var runningView = function (txt) {
-		return _List_fromArray(
-			[
-				A2(
-				$rtfeldman$elm_css$Html$Styled$button,
-				_List_fromArray(
-					[
-						$rtfeldman$elm_css$Html$Styled$Events$onClick($author$project$Snake$Stop)
-					]),
-				_List_fromArray(
-					[
-						$rtfeldman$elm_css$Html$Styled$text(txt)
-					])),
-				A2(
-				$rtfeldman$elm_css$Html$Styled$div,
-				_List_Nil,
-				_List_fromArray(
-					[
-						$rtfeldman$elm_css$Html$Styled$text('Score: '),
-						$rtfeldman$elm_css$Html$Styled$text(
-						$elm$core$String$fromInt(
-							$author$project$Snake$fromScore(model.aO)))
-					])),
-				A2(
-				$rtfeldman$elm_css$Html$Styled$div,
-				_List_fromArray(
-					[
-						$rtfeldman$elm_css$Html$Styled$Attributes$css(
-						_List_fromArray(
-							[
-								$rtfeldman$elm_css$Css$backgroundColor($author$project$Snake$grey)
-							]))
-					]),
-				A2(
-					$author$project$Plane$mapRows,
-					$author$project$Snake$viewRow(model),
-					model.C))
-			]);
-	};
+	var baseRunningView = _List_fromArray(
+		[
+			A2(
+			$rtfeldman$elm_css$Html$Styled$div,
+			_List_Nil,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$text('Score: '),
+					$rtfeldman$elm_css$Html$Styled$text(
+					$elm$core$String$fromInt(
+						$author$project$Snake$fromScore(model.ad)))
+				])),
+			A2(
+			$rtfeldman$elm_css$Html$Styled$div,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$Attributes$css(
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Css$backgroundColor($author$project$Snake$grey)
+						]))
+				]),
+			A2(
+				$author$project$Plane$mapRows,
+				$author$project$Snake$viewRow(model),
+				model.C))
+		]);
+	var deadView = A2(
+		$elm$core$List$cons,
+		A2(
+			$rtfeldman$elm_css$Html$Styled$div,
+			_List_Nil,
+			_List_fromArray(
+				[
+					A2(
+					$rtfeldman$elm_css$Html$Styled$input,
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Html$Styled$Events$onInput($author$project$Snake$NameChanged)
+						]),
+					_List_Nil),
+					A2(
+					$rtfeldman$elm_css$Html$Styled$button,
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Html$Styled$Events$onClick($author$project$Snake$Died)
+						]),
+					_List_fromArray(
+						[
+							$rtfeldman$elm_css$Html$Styled$text('Game Over')
+						]))
+				])),
+		_Utils_ap(
+			baseRunningView,
+			_List_fromArray(
+				[
+					$author$project$Snake$viewScores(model)
+				])));
+	var runningView = A2(
+		$elm$core$List$cons,
+		A2(
+			$rtfeldman$elm_css$Html$Styled$button,
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$Events$onClick($author$project$Snake$Stop)
+				]),
+			_List_fromArray(
+				[
+					$rtfeldman$elm_css$Html$Styled$text('Stop')
+				])),
+		baseRunningView);
 	var content = function () {
-		var _v0 = model.b6;
+		var _v0 = model.b8;
 		switch (_v0) {
 			case 0:
-				return runningView('Stop');
+				return runningView;
 			case 1:
 				return stoppedView;
 			default:
-				return runningView('Game over');
+				return deadView;
 		}
 	}();
 	return A2(
@@ -11584,7 +11744,7 @@ var $author$project$TicTacToe$setController = F3(
 			function (r) {
 				return _Utils_update(
 					r,
-					{aG: contr});
+					{aI: contr});
 			},
 			opts,
 			player);
@@ -11592,7 +11752,7 @@ var $author$project$TicTacToe$setController = F3(
 var $author$project$TicTacToe$controllerSelection = F4(
 	function (model, id, lbl, player) {
 		var p = function (f) {
-			return A2(f, model._, player);
+			return A2(f, model.aa, player);
 		};
 		var setOpts = function (c) {
 			return $author$project$TicTacToe$OptionChanged(
@@ -11733,7 +11893,7 @@ var $rtfeldman$elm_css$Html$Styled$table = $rtfeldman$elm_css$Html$Styled$node('
 var $author$project$TicTacToe$refSize = 15;
 var $author$project$TicTacToe$boardSize = $rtfeldman$elm_css$Css$em($author$project$TicTacToe$refSize);
 var $rtfeldman$elm_css$Css$borderSpacing = $rtfeldman$elm_css$Css$prop1('border-spacing');
-var $rtfeldman$elm_css$Css$fixed = {aE: 0, aM: 0, a8: 0, K: 'fixed'};
+var $rtfeldman$elm_css$Css$fixed = {aF: 0, aP: 0, ba: 0, K: 'fixed'};
 var $rtfeldman$elm_css$Css$tableLayout = $rtfeldman$elm_css$Css$prop1('table-layout');
 var $author$project$TicTacToe$tableStyle = $rtfeldman$elm_css$Html$Styled$Attributes$css(
 	_List_fromArray(
@@ -11757,11 +11917,11 @@ var $rtfeldman$elm_css$Css$withPrecedingHash = function (str) {
 };
 var $rtfeldman$elm_css$Css$erroneousHex = function (str) {
 	return {
-		aD: 1,
-		aF: 0,
+		aE: 1,
+		aG: 0,
 		D: 0,
-		aI: 0,
-		aN: 0,
+		aK: 0,
+		aQ: 0,
 		K: $rtfeldman$elm_css$Css$withPrecedingHash(str)
 	};
 };
@@ -12015,11 +12175,11 @@ var $rtfeldman$elm_css$Css$validHex = F5(
 			var blue = _v6.a.a;
 			var alpha = _v6.b.a;
 			return {
-				aD: alpha / 255,
-				aF: blue,
+				aE: alpha / 255,
+				aG: blue,
 				D: 0,
-				aI: green,
-				aN: red,
+				aK: green,
+				aQ: red,
 				K: $rtfeldman$elm_css$Css$withPrecedingHash(str)
 			};
 		} else {
@@ -12190,7 +12350,7 @@ var $author$project$TicTacToe$symbolFor = F2(
 		var p1 = _v1.a;
 		var p2 = _v1.b;
 		return $rtfeldman$elm_css$Html$Styled$text(
-			_Utils_eq(player, $author$project$TicTacToe$player1) ? $elm$core$String$fromChar(p1.aP) : $elm$core$String$fromChar(p2.aP));
+			_Utils_eq(player, $author$project$TicTacToe$player1) ? $elm$core$String$fromChar(p1.aS) : $elm$core$String$fromChar(p2.aS));
 	});
 var $rtfeldman$elm_css$Html$Styled$td = $rtfeldman$elm_css$Html$Styled$node('td');
 var $author$project$TicTacToe$viewCell = F2(
@@ -12207,7 +12367,7 @@ var $author$project$TicTacToe$viewCell = F2(
 				A2($author$project$TicTacToe$decorateVictory, model.x, cell),
 				_List_fromArray(
 					[
-						A2($author$project$TicTacToe$symbolFor, player, model._)
+						A2($author$project$TicTacToe$symbolFor, player, model.aa)
 					]));
 		} else {
 			var _v1 = model.x;
@@ -12431,7 +12591,7 @@ var $author$project$Main$selectedStyle = _List_fromArray(
 var $rtfeldman$elm_css$Css$borderBottom2 = $rtfeldman$elm_css$Css$prop2('border-bottom');
 var $rtfeldman$elm_css$Css$flexWrap = $rtfeldman$elm_css$Css$prop1('flex-wrap');
 var $rtfeldman$elm_css$Css$lineHeight = $rtfeldman$elm_css$Css$prop1('line-height');
-var $rtfeldman$elm_css$Css$wrap = {aH: 0, a_: 0, K: 'wrap'};
+var $rtfeldman$elm_css$Css$wrap = {aJ: 0, a0: 0, K: 'wrap'};
 var $author$project$Main$tabHeaderStyle = _List_fromArray(
 	[
 		$rtfeldman$elm_css$Css$displayFlex,
@@ -12985,16 +13145,16 @@ var $rtfeldman$elm_css$VirtualDom$Styled$toUnstyled = function (vdom) {
 var $rtfeldman$elm_css$Html$Styled$toUnstyled = $rtfeldman$elm_css$VirtualDom$Styled$toUnstyled;
 var $author$project$Main$view = function (model) {
 	return {
-		cm: _List_fromArray(
+		co: _List_fromArray(
 			[
 				$rtfeldman$elm_css$Html$Styled$toUnstyled(
 				$author$project$Main$tabed(model))
 			]),
-		cI: 'Games!'
+		cJ: 'Games!'
 	};
 };
 var $author$project$Main$main = $elm$browser$Browser$document(
-	{cw: $author$project$Main$init, cH: $author$project$Main$subscriptions, cJ: $author$project$Main$update, cL: $author$project$Main$view});
+	{cy: $author$project$Main$init, cI: $author$project$Main$subscriptions, cK: $author$project$Main$update, cM: $author$project$Main$view});
 _Platform_export({'Main':{'init':$author$project$Main$main(
 	$elm$json$Json$Decode$succeed(0))(0)}});}(this));
 
