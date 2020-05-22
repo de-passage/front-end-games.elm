@@ -1,0 +1,20 @@
+{
+  "name": "front-end-games.elm",
+  "version": "1.0.0",
+  "description": "Front end games with elm",
+  "main": "elm.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "make": "elm make src/Main.elm --optimize --output=elm.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/de-passage/front-end-games.elm.git"
+  },
+  "author": "Sylvain Leclercq",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/de-passage/front-end-games.elm/issues"
+  },
+  "homepage": "https://github.com/de-passage/front-end-games.elm#readme"
+}
