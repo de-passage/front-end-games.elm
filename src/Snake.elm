@@ -2,7 +2,8 @@ module Snake exposing (Cell(..), Model, Msg, init, subscriptions, update, view)
 
 import Array
 import Browser.Events
-import Css exposing (..)
+import Css as Css exposing (..)
+import Css.Media as M
 import CustomElements as CE
 import Html.Events.Extra exposing (targetValueIntParse)
 import Html.Styled exposing (Html, button, div, input, label, li, option, select, text, ul)
@@ -364,7 +365,9 @@ viewRow model array =
 viewOptions : Model -> Html Msg
 viewOptions model =
     div
-        []
+        [ css
+            []
+        ]
         [ div []
             [ label [] [ text "Speed" ]
             , speedInput model
@@ -448,14 +451,70 @@ view model =
     in
     div
         [ css
-            [ margin auto
-            , maxWidth fitContent
+            [ displayFlex
+            , xsScreen [ Css.width (pct 100) ]
+            , smScreen [ Css.width (pct 90), marginLeft (pct 5) ]
+            , mdScreen [ Css.width (pct 50), marginLeft (pct 25) ]
             ]
         ]
-        content
+        [ div
+            [ css [ margin auto ] ]
+            content
+        ]
+
+
+smScreenMax : Px
+smScreenMax =
+    px 768
+
+
+mdScreenMax : Px
+mdScreenMax =
+    px 992
+
+
+lgScreenMin : Px
+lgScreenMin =
+    px 1200
+
+
+xsScreen : List Style -> Style
+xsScreen =
+    M.withMedia [ M.only M.screen [ M.maxWidth smScreenMax ] ]
+
+
+smScreen : List Style -> Style
+smScreen =
+    M.withMedia [ M.only M.screen [ M.maxWidth mdScreenMax ] ]
+
+
+mdScreen : List Style -> Style
+mdScreen =
+    M.withMedia [ M.only M.screen [ M.maxWidth lgScreenMin ] ]
+
+
+smScreenOnly : List Style -> Style
+smScreenOnly =
+    M.withMedia [ M.all [ M.minWidth smScreenMax, M.maxWidth mdScreenMax ] ]
+
+
+mdScreenOnly : List Style -> Style
+mdScreenOnly =
+    M.withMedia [ M.all [ M.minWidth mdScreenMax, M.maxWidth lgScreenMin ] ]
+
+
+lgScreen : List Style -> Style
+lgScreen =
+    M.withMedia [ M.only M.screen [ M.minWidth lgScreenMin ] ]
 
 
 
+{-
+   @media (max-width: @screen-xs-max) { ... } 768 992 1200
+   @media (min-width: @screen-sm-min) and (max-width: @screen-sm-max) { ... }
+   @media (min-width: @screen-md-min) and (max-width: @screen-md-max) { ... }
+   @media (min-width: @screen-lg-min) { ... }
+-}
 -- UPDATE
 
 

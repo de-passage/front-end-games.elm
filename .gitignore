@@ -4,3 +4,4 @@ elm-stuff
 repl-temp-*
 
 .vscode
+node_modules
