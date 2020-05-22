@@ -1,0 +1,23 @@
+{
+  "name": "front-end-games.elm",
+  "version": "1.0.0",
+  "description": "A few in-browser games written in Elm. WIP. Depends on packages never to be published, available on my github ([Wrapped](https://github.com/de-passage/wrapped.elm), [Function](https://github.com/de-passage/function.elm), [Defered](https://github.com/de-passage/defered.elm)).",
+  "main": "index.js",
+  "dependencies": {
+    "elm-live": "^4.0.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/de-passage/front-end-games.elm.git"
+  },
+  "author": "Sylvain Leclercq",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/de-passage/front-end-games.elm/issues"
+  },
+  "homepage": "https://github.com/de-passage/front-end-games.elm#readme"
+}
