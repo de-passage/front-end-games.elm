@@ -22,7 +22,7 @@ module.exports = {
             }]
     },
     mode: "development",
-    entry: { index: path.resolve(__dirname, "index.js") },
+    entry: { index: path.resolve(__dirname, "webpack-entry.js") },
     output: { path: __dirname, filename: "elm.js" },
     devServer: {
         contentBase: '.',
