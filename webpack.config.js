@@ -5,7 +5,7 @@ module.exports = {
         rules: [
             {
                 test: /\.html$/,
-                exclude: [ /node_modules/, /elm-stuff/ ],
+                exclude: [/node_modules/, /elm-stuff/],
                 loader: 'file-loader?name=[name].[ext]'
             },
             {
@@ -22,6 +22,9 @@ module.exports = {
             }]
     },
     mode: "development",
-    entry: { index: path.resolve(__dirname, "index.js") }
-    , output: { path: __dirname, filename: "elm.js" }
+    entry: { index: path.resolve(__dirname, "index.js") },
+    output: { path: __dirname, filename: "elm.js" },
+    devServer: {
+        contentBase: '.',
+    },
 };

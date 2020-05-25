@@ -9,11 +9,13 @@
     "elm-webpack-loader": "^6.0.1",
     "file-loader": "^6.0.0",
     "webpack": "^4.43.0",
-    "webpack-cli": "^3.3.11"
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.11.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "make": "elm make src/Main.elm --optimize --output=elm.js"
+    "make": "elm make src/Main.elm --optimize --output=elm.js",
+    "server": "webpack-dev-server --open"
   },
   "repository": {
     "type": "git",
