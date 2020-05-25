@@ -25,12 +25,12 @@ xsScreen =
 
 smScreen : List Style -> Style
 smScreen =
-    M.withMedia [ M.only M.screen [ M.maxWidth mdScreenMax ] ]
+    M.withMedia [ M.only M.screen [ M.minWidth mdScreenMax ] ]
 
 
 mdScreen : List Style -> Style
 mdScreen =
-    M.withMedia [ M.only M.screen [ M.maxWidth lgScreenMin ] ]
+    M.withMedia [ M.only M.screen [ M.minWidth lgScreenMin ] ]
 
 
 smScreenOnly : List Style -> Style

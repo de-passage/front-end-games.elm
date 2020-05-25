@@ -1,11 +1,13 @@
 module Snake exposing (Cell(..), Model, Msg, init, subscriptions, update, view)
 
 import Array
-import Browser.Events
+import Browser.Dom exposing (Error(..), Viewport, getViewport)
+import Browser.Events exposing (onResize)
 import Css as Css exposing (..)
 import CustomElements as CE
+import Debug
 import Html.Events.Extra exposing (targetValueIntParse)
-import Html.Styled exposing (Html, button, div, input, label, li, option, select, text, ul)
+import Html.Styled exposing (Attribute, Html, button, div, input, label, li, option, select, text, ul)
 import Html.Styled.Attributes as Attributes exposing (css, max, min, selected, value)
 import Html.Styled.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
@@ -14,6 +16,7 @@ import List.Extra as List
 import Plane exposing (Coordinates, Height(..), Plane, Point, Row, Width(..), X(..), Y(..))
 import Random
 import Screens exposing (lgScreen, mdScreen, smScreen, xsScreen)
+import Task
 import Time
 
 
@@ -29,6 +32,9 @@ type Msg
     | Died
     | SetLevel Int
     | NameChanged String
+    | GotNewSize Float Float
+    | GotError String
+    | Resized
 
 
 type Cell
@@ -80,6 +86,7 @@ type alias Model =
     , status : GameStatus
     , highScores : List ( Score, String )
     , name : String
+    , cellSize : Float
     }
 
 
@@ -102,10 +109,6 @@ minSpeed =
     Speed 1
 
 
-
--- INIT
-
-
 height : Height
 height =
     Height 20
@@ -114,6 +117,10 @@ height =
 width : Width
 width =
     Width 50
+
+
+
+-- INIT
 
 
 emptyPlane : Plane Cell
@@ -149,12 +156,30 @@ initialGame =
     , status = Stopped
     , highScores = []
     , name = ""
+    , cellSize = 10
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialGame, Cmd.none )
+    ( initialGame, getWindowSize )
+
+
+getWindowSize : Cmd Msg
+getWindowSize =
+    let
+        handleNewSize : Result Error Viewport -> Msg
+        handleNewSize r =
+            case r of
+                Err _ ->
+                    GotError "Couldn't find game plane"
+
+                Ok viewport ->
+                    GotNewSize viewport.viewport.width viewport.viewport.height
+    in
+    Task.attempt
+        handleNewSize
+        getViewport
 
 
 makeTickSpeed : Speed -> Float
@@ -174,10 +199,11 @@ subscriptions model =
                 [ Time.every model.tickSpeed (always Tick)
                 , Browser.Events.onKeyDown (decodeDirection model)
                 , Time.every 1800 (always NewTargetTick)
+                , onResize (\_ _ -> Resized)
                 ]
 
         _ ->
-            Sub.none
+            onResize (\_ _ -> Resized)
 
 
 decodeDirection : Model -> Decode.Decoder Msg
@@ -353,26 +379,25 @@ viewCell model coordinates cell =
                 TargetCell ->
                     [ backgroundColor red ]
     in
-    div [ css (cellStyle ++ style) ] []
+    div [ css (cellStyle model.cellSize ++ style) ] []
 
 
 viewRow : Model -> Row Cell -> Html Msg
 viewRow model array =
-    div [ css [ displayFlex ] ]
+    div [ rowStyle ]
         (Array.toList <| Plane.mapIndexedRow (viewCell model) array)
 
 
 viewOptions : Model -> Html Msg
 viewOptions model =
     div
-        [ css
-            []
+        [ optionDivStyle
         ]
-        [ div []
-            [ label [] [ text "Speed" ]
+        [ div [ speedInputStyle ]
+            [ label [ speedInputLabelStyle ] [ text "Speed" ]
             , speedInput model
             ]
-        , div []
+        , div [ levelSelectionStyle ]
             [ levelSelection model
             , text model.log
             ]
@@ -450,15 +475,10 @@ view model =
             ]
     in
     div
-        [ css
-            [ displayFlex
-            , xsScreen [ Css.width (pct 100) ]
-            , smScreen [ Css.width (pct 90), marginLeft (pct 5) ]
-            , mdScreen [ Css.width (pct 50), marginLeft (pct 25) ]
-            ]
+        [ mainDivStyle
         ]
         [ div
-            [ css [ margin auto ] ]
+            [ contentStyle ]
             content
         ]
 
@@ -580,6 +600,15 @@ update msg model =
         NameChanged n ->
             ( { model | name = n }, Cmd.none )
 
+        GotNewSize w _ ->
+            ( { model | cellSize = w }, Cmd.none )
+
+        GotError err ->
+            ( { model | log = err }, Cmd.none )
+
+        Resized ->
+            ( model, getWindowSize )
+
 
 validLevelFrom : Model -> Int -> Level -> ( Model, Cmd Msg )
 validLevelFrom m i l =
@@ -627,20 +656,6 @@ generateXY (Width w) (Height h) =
 -- CSS STYLES
 
 
-cellSize : Em
-cellSize =
-    em 1
-
-
-cellStyle : List Style
-cellStyle =
-    [ overflow hidden
-    , textOverflow ellipsis
-    , Css.width cellSize
-    , Css.height cellSize
-    ]
-
-
 grey : Color
 grey =
     rgb 175 175 175
@@ -659,6 +674,88 @@ black =
 red : Color
 red =
     rgb 255 0 0
+
+
+forXsScreen : (Float -> List Style) -> Style
+forXsScreen f =
+    xsScreen (f 100)
+
+
+forSmScreen : (Float -> List Style) -> Style
+forSmScreen f =
+    smScreen (f 90)
+
+
+forMdScreen : (Float -> List Style) -> Style
+forMdScreen f =
+    mdScreen (f 50)
+
+
+forAllScreens : (Float -> List Style) -> List Style
+forAllScreens f =
+    List.map (\s -> s f) [ forXsScreen, forSmScreen, forMdScreen ]
+
+
+mainDivStyle : Attribute msg
+mainDivStyle =
+    let
+        computeDimensions p =
+            [ Css.width (pct p), marginLeft (pct ((100 - p) / 2)) ]
+    in
+    css (displayFlex :: forAllScreens computeDimensions)
+
+
+optionDivStyle : Attribute msg
+optionDivStyle =
+    css
+        [ displayFlex
+        , Css.flexDirection Css.column
+        ]
+
+
+speedInputStyle : Attribute msg
+speedInputStyle =
+    css []
+
+
+speedInputLabelStyle : Attribute msg
+speedInputLabelStyle =
+    css [ Css.marginRight (em 1) ]
+
+
+levelSelectionStyle : Attribute msg
+levelSelectionStyle =
+    css
+        [ Css.marginTop (px 4)
+        , Css.marginBottom (px 4)
+        ]
+
+
+contentStyle : Attribute msg
+contentStyle =
+    css
+        [ margin auto
+        , Css.minWidth (pct 50)
+        ]
+
+
+rowStyle : Attribute msg
+rowStyle =
+    css [ displayFlex ]
+
+
+cellStyle : Float -> List Style
+cellStyle cellSize =
+    let
+        computeSize p =
+            [ Css.height (px ((cellSize / 50) * p / 100))
+            , Css.width (px ((cellSize / 50) * p / 100))
+            ]
+    in
+    [ overflow hidden
+    , textOverflow ellipsis
+    ]
+        ++ forAllScreens computeSize
 
 
 
