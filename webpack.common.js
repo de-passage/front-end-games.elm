@@ -15,16 +15,13 @@ module.exports = {
                     {
                         loader: 'elm-webpack-loader',
                         options: {
-                            cwd: __dirname
+                            cwd: __dirname,
+                            optimize: true
                         }
                     }
                 ]
             }]
     },
-    mode: "development",
     entry: { index: path.resolve(__dirname, "webpack-entry.js") },
-    output: { path: __dirname, filename: "elm.js" },
-    devServer: {
-        contentBase: '.',
-    },
+    output: { path: __dirname, filename: "elm.js" }
 };
