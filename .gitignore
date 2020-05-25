@@ -6,3 +6,4 @@ repl-temp-*
 .vscode
 node_modules
 elm.js
+dist

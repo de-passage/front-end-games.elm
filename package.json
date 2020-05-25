@@ -2,9 +2,15 @@
   "name": "front-end-games.elm",
   "version": "1.0.0",
   "description": "Front end games with elm",
-  "main": "elm.js",
+  "private": true,
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "elm-hot-webpack-loader": "^1.1.6",
+    "elm-webpack-loader": "^6.0.1",
+    "file-loader": "^6.0.0",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.11"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "make": "elm make src/Main.elm --optimize --output=elm.js"
