@@ -36,9 +36,7 @@ type GameTag
     | GuessANumberT
 
 
-type alias Model =
-    { gameModel : GameModel
-    }
+type alias Model = GameModel
 
 
 type ExtMsg
@@ -59,18 +57,28 @@ type Msg
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
+    initialModel SnakeT
+
+
+initialModel : GameTag -> ( GameModel, Cmd Msg )
+initialModel tag =
     let
-        ( model, command ) =
-            SK.init
+        fromTTTCmd : Cmd TTT.Msg -> Cmd Msg
+        fromTTTCmd =
+            adaptCmd TicTacToeMsg
+
+        fromMSCmd : Cmd MS.Msg -> Cmd Msg
+        fromMSCmd =
+            adaptCmd MinesweeperMsg
+
+        fromSKCmd : Cmd SK.Msg -> Cmd Msg
+        fromSKCmd =
+            adaptCmd SnakeMsg
+
+        fromGANCmd : Cmd GAN.Msg -> Cmd Msg
+        fromGANCmd =
+            adaptCmd GuessANumberMsg
     in
-    ( { gameModel = Snake model
-      }
-    , fromSKCmd command
-    )
-
-
-initialGame : GameTag -> ( GameModel, Cmd Msg )
-initialGame tag =
     case tag of
         MinesweeperT ->
             MS.init |> Tuple.mapBoth Minesweeper fromMSCmd
@@ -94,54 +102,9 @@ adaptCmd =
     adaptFunc Cmd.map
 
 
-adaptHtml : (msg -> ExtMsg) -> Html msg -> Html Msg
-adaptHtml =
-    adaptFunc Html.map
-
-
 adaptFunc : ((b -> Msg) -> a -> c) -> (b -> ExtMsg) -> a -> c
 adaptFunc m f a =
     m (f >> ExternalMessage) a
-
-
-fromTTTCmd : Cmd TTT.Msg -> Cmd Msg
-fromTTTCmd =
-    adaptCmd TicTacToeMsg
-
-
-fromMSCmd : Cmd MS.Msg -> Cmd Msg
-fromMSCmd =
-    adaptCmd MinesweeperMsg
-
-
-fromSKCmd : Cmd SK.Msg -> Cmd Msg
-fromSKCmd =
-    adaptCmd SnakeMsg
-
-
-fromGANCmd : Cmd GAN.Msg -> Cmd Msg
-fromGANCmd =
-    adaptCmd GuessANumberMsg
-
-
-fromTTTHtml : Html TTT.Msg -> Html Msg
-fromTTTHtml =
-    adaptHtml TicTacToeMsg
-
-
-fromMSHtml : Html MS.Msg -> Html Msg
-fromMSHtml =
-    adaptHtml MinesweeperMsg
-
-
-fromSKHtml : Html SK.Msg -> Html Msg
-fromSKHtml =
-    adaptHtml SnakeMsg
-
-
-fromGANHtml : Html GAN.Msg -> Html Msg
-fromGANHtml =
-    adaptHtml GuessANumberMsg
 
 
 dispatchUpdate :
@@ -213,21 +176,19 @@ mapUpdate :
     (msg -> model -> ( model, Cmd msg ))
     -> (msg -> ExtMsg)
     -> (model -> GameModel)
-    -> Model
     -> msg
     -> model
     -> ( Model, Cmd Msg )
-mapUpdate upd toMsg toModel model1 msg model =
+mapUpdate upd toMsg toModel msg model =
     let
         ( m, c ) =
             upd msg model
     in
-    ( { model1 | gameModel = toModel m }, adaptCmd toMsg c )
+    ( toModel m, adaptCmd toMsg c )
 
 
 updateTTT :
-    Model
-    -> TTT.Msg
+    TTT.Msg
     -> TTT.Model
     -> ( Model, Cmd Msg )
 updateTTT =
@@ -235,8 +196,7 @@ updateTTT =
 
 
 updateMS :
-    Model
-    -> MS.Msg
+    MS.Msg
     -> MS.Model
     -> ( Model, Cmd Msg )
 updateMS =
@@ -244,8 +204,7 @@ updateMS =
 
 
 updateSK :
-    Model
-    -> SK.Msg
+    SK.Msg
     -> SK.Model
     -> ( Model, Cmd Msg )
 updateSK =
@@ -253,8 +212,7 @@ updateSK =
 
 
 updateGAN :
-    Model
-    -> GAN.Msg
+    GAN.Msg
     -> GAN.Model
     -> ( Model, Cmd Msg )
 updateGAN =
@@ -266,38 +224,25 @@ noCmd a =
     ( a, Cmd.none )
 
 
-getGame : Model -> GameModel
-getGame m =
-    m.gameModel
-
-
-setGame : Model -> GameModel -> Model
-setGame m g =
-    { m | gameModel = g }
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ExternalMessage msg1 ->
-            Function.lift6
-                (dispatchUpdate msg1)
-                noCmd
+            dispatchUpdate msg1
+                (noCmd model)
                 updateTTT
                 updateMS
                 updateSK
                 updateGAN
-                getGame
                 model
 
         GameChanged newGame ->
-            initialGame newGame
-                |> Tuple.mapFirst (setGame model)
+            initialModel newGame
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.gameModel of
+    case model of
         Snake m ->
             Sub.map (SnakeMsg >> ExternalMessage) (SK.subscriptions m)
 
@@ -321,13 +266,14 @@ tabsFor model =
             [ ( "Minesweeper", MinesweeperT )
             , ( "TicTacToe", TicTacToeT )
             , ( "Snake", SnakeT )
+
             -- , ( "Guess a number", GuessANumberT )
             ]
 
         tabStyle tag =
             let
                 additional =
-                    if isGame tag model.gameModel then
+                    if isGame tag model then
                         basicTabStyle ++ selectedStyle
 
                     else
@@ -336,7 +282,7 @@ tabsFor model =
             marginRight (px 10) :: additional
 
         onClickEvent tag =
-            if not <| isGame tag model.gameModel then
+            if not <| isGame tag model then
                 [ onClick (GameChanged tag) ]
 
             else
@@ -354,26 +300,31 @@ tabed : Model -> Html Msg
 tabed model =
     div []
         [ tabsFor model
-        , gameView model.gameModel
+        , gameView model
         ]
 
 
 gameView : GameModel -> Html Msg
 gameView m =
+    let
+        adaptHtml : (msg -> ExtMsg) -> Html msg -> Html Msg
+        adaptHtml =
+            adaptFunc Html.map
+    in
     case m of
         TicTacToe model ->
             div []
-                [ fromTTTHtml (TTT.view model) ]
+                [ adaptHtml TicTacToeMsg (TTT.view model) ]
 
         Minesweeper model ->
             div []
-                [ fromMSHtml (MS.view model) ]
+                [ adaptHtml MinesweeperMsg (MS.view model) ]
 
         Snake model ->
-            div [] [ fromSKHtml (SK.view model) ]
-        
+            div [] [ adaptHtml SnakeMsg (SK.view model) ]
+
         GuessANumber model ->
-            div [] [ fromGANHtml (GAN.view model)]
+            div [] [ adaptHtml GuessANumberMsg (GAN.view model) ]
 
 
 
@@ -383,11 +334,6 @@ gameView m =
 white : Color
 white =
     rgb 255 255 255
-
-
-black : Color
-black =
-    rgb 0 0 0
 
 
 selectedBgColor : Color
