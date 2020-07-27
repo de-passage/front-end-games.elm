@@ -2,13 +2,13 @@ module Main exposing (Model, Msg, init, main, subscriptions, update, view)
 
 import Browser
 import Css exposing (..)
-import Function
 import GuessANumber as GAN
 import Html.Styled as Html exposing (..)
 import Html.Styled.Attributes exposing (..)
 import Html.Styled.Events exposing (..)
 import Minesweeper as MS
 import Snake as SK
+import Tetris as T
 import TicTacToe as TTT
 
 
@@ -27,6 +27,7 @@ type GameModel
     | Minesweeper MS.Model
     | Snake SK.Model
     | GuessANumber GAN.Model
+    | Tetris T.Model
 
 
 type GameTag
@@ -34,9 +35,11 @@ type GameTag
     | MinesweeperT
     | SnakeT
     | GuessANumberT
+    | TetrisT
 
 
-type alias Model = GameModel
+type alias Model =
+    GameModel
 
 
 type ExtMsg
@@ -44,6 +47,7 @@ type ExtMsg
     | MinesweeperMsg MS.Msg
     | SnakeMsg SK.Msg
     | GuessANumberMsg GAN.Msg
+    | TetrisMsg T.Msg
 
 
 type Msg
@@ -78,6 +82,10 @@ initialModel tag =
         fromGANCmd : Cmd GAN.Msg -> Cmd Msg
         fromGANCmd =
             adaptCmd GuessANumberMsg
+
+        fromTCmd : Cmd T.Msg -> Cmd Msg
+        fromTCmd =
+            adaptCmd TetrisMsg
     in
     case tag of
         MinesweeperT ->
@@ -91,6 +99,9 @@ initialModel tag =
 
         GuessANumberT ->
             GAN.init |> Tuple.mapBoth GuessANumber fromGANCmd
+
+        TetrisT ->
+            T.init |> Tuple.mapBoth Tetris fromTCmd
 
 
 
@@ -114,9 +125,10 @@ dispatchUpdate :
     -> (MS.Msg -> MS.Model -> a)
     -> (SK.Msg -> SK.Model -> a)
     -> (GAN.Msg -> GAN.Model -> a)
+    -> (T.Msg -> T.Model -> a)
     -> GameModel
     -> a
-dispatchUpdate msg default ttt ms sk gan model =
+dispatchUpdate msg default ttt ms sk gan tetris model =
     case msg of
         TicTacToeMsg msg1 ->
             case model of
@@ -150,6 +162,14 @@ dispatchUpdate msg default ttt ms sk gan model =
                 _ ->
                     default
 
+        TetrisMsg msg1 ->
+            case model of
+                Tetris m ->
+                    tetris msg1 m
+
+                _ ->
+                    default
+
 
 gameType : GameModel -> GameTag
 gameType model =
@@ -165,6 +185,9 @@ gameType model =
 
         GuessANumber _ ->
             GuessANumberT
+
+        Tetris _ ->
+            TetrisT
 
 
 isGame : GameTag -> GameModel -> Bool
@@ -219,6 +242,11 @@ updateGAN =
     mapUpdate GAN.update GuessANumberMsg GuessANumber
 
 
+updateT : T.Msg -> T.Model -> ( Model, Cmd Msg )
+updateT =
+    mapUpdate T.update TetrisMsg Tetris
+
+
 noCmd : a -> ( a, Cmd msg )
 noCmd a =
     ( a, Cmd.none )
@@ -234,6 +262,7 @@ update msg model =
                 updateMS
                 updateSK
                 updateGAN
+                updateT
                 model
 
         GameChanged newGame ->
@@ -266,6 +295,7 @@ tabsFor model =
             [ ( "Minesweeper", MinesweeperT )
             , ( "TicTacToe", TicTacToeT )
             , ( "Snake", SnakeT )
+            , ( "Tetris", TetrisT )
 
             -- , ( "Guess a number", GuessANumberT )
             ]
@@ -325,6 +355,9 @@ gameView m =
 
         GuessANumber model ->
             div [] [ adaptHtml GuessANumberMsg (GAN.view model) ]
+
+        Tetris model ->
+            div [] [ adaptHtml TetrisMsg (T.view model) ]
 
 
 
